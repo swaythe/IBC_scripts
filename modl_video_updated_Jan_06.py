@@ -89,7 +89,7 @@ n_epochs = 2
 verbose = 15
 n_jobs = 2
 smoothing_fwhm = 6
-memory = Memory(cachedir=get_cache_dirs()[0], verbose=2)
+# memory = Memory(cachedir=get_cache_dirs()[0], verbose=2)
 
 dict_init = fetch_atlas_smith_2009().rsn20
 
@@ -97,26 +97,41 @@ dict_init = fetch_atlas_smith_2009().rsn20
 _package_directory = os.path.dirname(os.path.abspath(ibc_public.__file__))
 mask = nib.load(os.path.join(_package_directory, '../ibc_data', 'gm_mask_3mm.nii.gz'))
 
-# dict_fact = fMRIDictFact(smoothing_fwhm=smoothing_fwhm,
-#                          standardize=True,
-#                          high_pass=1./128,
-#                          t_r=2.0,
-#                          method=method,
-#                          step_size=step_size,
-#                          mask=mask,
-#                          memory_level=2,
-#                          verbose=verbose,
-#                          n_epochs=n_epochs,
-#                          n_jobs=n_jobs,
-#                          random_state=1,
-#                          n_components=n_components,
-#                          dict_init=dict_init,
-#                          positive=True,
-#                          learning_rate=learning_rate,
-#                          batch_size=batch_size,
-#                          reduction=reduction,
-#                          alpha=alpha,
-#                          )
-#                          # memory=memory,
-#
-# dict_fact.fit(files_)
+# Run through the different numbers of decompositions
+for ci, comp in enumerate n_components:
+    dict_fact = fMRIDictFact(smoothing_fwhm=smoothing_fwhm,
+                             standardize=True,
+                             high_pass=1./128,
+                             t_r=2.0,
+                             method=method,
+                             step_size=step_size,
+                             mask=mask,
+                             memory_level=2,
+                             verbose=verbose,
+                             n_epochs=n_epochs,
+                             n_jobs=n_jobs,
+                             random_state=1,
+                             n_components=n_components,
+                             dict_init=dict_init,
+                             positive=True,
+                             learning_rate=learning_rate,
+                             batch_size=batch_size,
+                             reduction=reduction,
+                             alpha=alpha,
+                             )
+                             # memory=memory,
+
+    dict_fact.fit(files_)
+
+    # Save the component images to disk after first
+    # creating a 'modl' directory for results
+    os.makedirs(os.path.join(home, 'modl', 'ncomp_' + str(comp)))
+
+    for i in range(comp):
+        nib.save(index_img(dict_fact.components_img_, i),
+                os.path.join(home, 'modl', 'ncomp_' + str(comp), 'component-' + str(i) + '.nii.gz'))
+
+    # Save the display_maps output to file
+    fig = plt.figure()
+    display_maps(fig, dict_fact.components_img_)
+    fig.savefig(os.path.join(home, 'modl', 'ncomp_' + str(comp), 'component_fig.pdf'), format='pdf')
