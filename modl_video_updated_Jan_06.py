@@ -22,7 +22,7 @@ monkey_patch_nifti_image()
 
 # Sepcify some input paths/folders
 home = '/home/parietal/sshankar'
-movie_dir = '/storage/store/data/ibc/3mm/'
+movie_dir = '/storage/store/data/ibc/3mm/' 
 
 # Task of interest
 task = 'clips'
@@ -97,6 +97,9 @@ dict_init = fetch_atlas_smith_2009().rsn20
 _package_directory = os.path.dirname(os.path.abspath(ibc_public.__file__))
 mask = nib.load(os.path.join(_package_directory, '../ibc_data', 'gm_mask_3mm.nii.gz'))
 
+# Specify output directory
+modl_op = os.path.join(home, task, 'modl')
+
 # Run through the different numbers of decompositions
 for ci, comp in enumerate n_components:
     dict_fact = fMRIDictFact(smoothing_fwhm=smoothing_fwhm,
@@ -124,14 +127,16 @@ for ci, comp in enumerate n_components:
     dict_fact.fit(files_)
 
     # Save the component images to disk after first
-    # creating a 'modl' directory for results
-    os.makedirs(os.path.join(home, 'modl', 'ncomp_' + str(comp)))
+    # creating a directory structure for results
+    comp_dir = os.path.join(modl_op, 'ncomp_' + str(comp), 'components')
+    os.makedirs(comp_dir)
 
     for i in range(comp):
         nib.save(index_img(dict_fact.components_img_, i),
-                os.path.join(home, 'modl', 'ncomp_' + str(comp), 'component-' + str(i) + '.nii.gz'))
+                os.path.join(comp_dir, 'component-' + str(i) + '.nii.gz'))
 
     # Save the display_maps output to file
     fig = plt.figure()
     display_maps(fig, dict_fact.components_img_)
-    fig.savefig(os.path.join(home, 'modl', 'ncomp_' + str(comp), 'component_fig.pdf'), format='pdf')
+    fig.savefig(os.path.join(comp_dir, '../component_fig.pdf'), format='pdf')
+    
