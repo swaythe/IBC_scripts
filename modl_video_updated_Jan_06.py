@@ -21,7 +21,7 @@ import pandas as pd
 monkey_patch_nifti_image()
 
 # Sepcify some input paths/folders
-home = '/home/sshankar'
+home = '/home/parietal/sshankar'
 movie_dir = '/storage/store/data/ibc/3mm/'
 
 # Task of interest
@@ -67,7 +67,7 @@ for s, sub in enumerate(subs):
     if os.path.isdir(os.path.join(movie_dir, sub)):
         sess = sorted(glob.glob(os.path.join(movie_dir, sub) + '/ses*'))
         for i, ses in enumerate(sess):
-            if os.path.isdir(ses) and i < sessn:
+            if os.path.isdir(ses):
                 movie_imgs = sorted(glob.glob(ses + '/' + filepattern))
                 for mi, mimg in enumerate(movie_imgs):
                     movie_arrays.append(mimg)
