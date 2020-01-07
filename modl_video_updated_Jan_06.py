@@ -66,7 +66,7 @@ movie_arrays = []
 for s, sub in enumerate(subs):
     if os.path.isdir(os.path.join(movie_dir, sub)):
         # sess = sorted(glob.glob(os.path.join(movie_dir, sub) + '/ses*'))
-        for i, ses in enumerate(sessions):
+        for i, ses in enumerate(sessions[s]):
             if os.path.isdir(os.path.join(movie_dir, sub, ses)):
                 movie_imgs = sorted(glob.glob(os.path.join(movie_dir, sub, ses) + '/func/' + filepattern))
                 for mi, mimg in enumerate(movie_imgs):
@@ -89,7 +89,7 @@ n_epochs = 2
 verbose = 15
 n_jobs = 2
 smoothing_fwhm = 6
-memory = Memory(cachedir=get_cache_dirs()[0], verbose=2)
+# memory = Memory(cachedir=get_cache_dirs()[0], verbose=2)
 
 dict_init = fetch_atlas_smith_2009().rsn20
 
