@@ -74,7 +74,7 @@ for s, sub in enumerate(subs):
 
 # Some manipulations to get the input in an acceptable format for MODL
 mov_df = pd.DataFrame(data=movie_arrays).values
-print(movie_df)
+print(mov_df)
 files_ = tuple([x[0] for x in mov_df])
 
 # Set up some parameters for MODL

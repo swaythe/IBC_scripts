@@ -21,4 +21,4 @@ fast_ica = FastICA(n_components=n_components,
 
 # Transform input data using the ICA model
 data_transform = fast_ica.fit_transform(sub_movie.T).T
-np.save(os.path.join(datadir, 'fastica_components.npy'), data_transform)
+np.save(os.path.join(datapath, 'fastica_components.npy'), data_transform)
