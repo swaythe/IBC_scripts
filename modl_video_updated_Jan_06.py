@@ -65,10 +65,10 @@ movie_arrays = []
 # Create 2D masked arrays from image data and save to file for quick and easy access
 for s, sub in enumerate(subs):
     if os.path.isdir(os.path.join(movie_dir, sub)):
-        sess = sorted(glob.glob(os.path.join(movie_dir, sub) + '/ses*'))
-        for i, ses in enumerate(sess):
-            if os.path.isdir(ses):
-                movie_imgs = sorted(glob.glob(ses + '/' + filepattern))
+        # sess = sorted(glob.glob(os.path.join(movie_dir, sub) + '/ses*'))
+        for i, ses in enumerate(sessions):
+            if os.path.isdir(os.path.join(movie_dir, sub, ses)):
+                movie_imgs = sorted(glob.glob(os.path.join(movie_dir, sub, ses) + '/func/' + filepattern))
                 for mi, mimg in enumerate(movie_imgs):
                     movie_arrays.append(mimg)
 
