@@ -16,6 +16,7 @@ import os
 import glob
 import nibabel as nib
 import pandas as pd
+from nilearn.image import index_img
 
 # Change some default fmri file-related functions to custom ones
 monkey_patch_nifti_image()
@@ -25,7 +26,7 @@ home = '/home/parietal/sshankar'
 movie_dir = '/storage/store/data/ibc/3mm/' 
 
 # Task of interest
-task = 'clips'
+task = 'raiders'
 
 # List the specific subjects/sessions/files that should be used
 if task == 'clips':
@@ -74,10 +75,10 @@ for s, sub in enumerate(subs):
 
 # Some manipulations to get the input in an acceptable format for MODL
 mov_df = pd.DataFrame(data=movie_arrays).values
-print(mov_df)
 files_ = tuple([x[0] for x in mov_df])
 
 # Set up some parameters for MODL
+# n_components = [20, 50, 100, 200]
 n_components = [20, 50, 100, 200]
 batch_size = 50
 learning_rate = .92
@@ -85,13 +86,13 @@ method = 'masked'
 step_size = 0.01
 reduction = 12
 alpha = 1e-3
-n_epochs = 2
+n_epochs = 1
 verbose = 15
 n_jobs = 2
 smoothing_fwhm = 6
-# memory = Memory(cachedir=get_cache_dirs()[0], verbose=2)
+memory = Memory(cachedir=get_cache_dirs()[0], verbose=2)
 
-dict_init = fetch_atlas_smith_2009().rsn20
+# dict_init = fetch_atlas_smith_2009().rsn20
 
 # Use the IBC group mask for masking data
 _package_directory = os.path.dirname(os.path.abspath(ibc_public.__file__))
@@ -101,7 +102,7 @@ mask = nib.load(os.path.join(_package_directory, '../ibc_data', 'gm_mask_3mm.nii
 modl_op = os.path.join(home, task, 'modl')
 
 # Run through the different numbers of decompositions
-for ci, comp in enumerate n_components:
+for ci, comp in enumerate(n_components):
     dict_fact = fMRIDictFact(smoothing_fwhm=smoothing_fwhm,
                              standardize=True,
                              high_pass=1./128,
@@ -114,29 +115,31 @@ for ci, comp in enumerate n_components:
                              n_epochs=n_epochs,
                              n_jobs=n_jobs,
                              random_state=1,
-                             n_components=n_components,
-                             dict_init=dict_init,
+                             n_components=comp,
                              positive=True,
                              learning_rate=learning_rate,
                              batch_size=batch_size,
                              reduction=reduction,
                              alpha=alpha,
+                             memory=memory,
                              )
                              # memory=memory,
+                             # dict_init=dict_init
 
     dict_fact.fit(files_)
 
     # Save the component images to disk after first
     # creating a directory structure for results
     comp_dir = os.path.join(modl_op, 'ncomp_' + str(comp), 'components')
-    os.makedirs(comp_dir)
+    if not os.path.isdir(comp_dir):
+        os.makedirs(comp_dir)
 
     for i in range(comp):
         nib.save(index_img(dict_fact.components_img_, i),
                 os.path.join(comp_dir, 'component-' + str(i) + '.nii.gz'))
 
     # Save the display_maps output to file
-    fig = plt.figure()
+    fig = mpl.figure()
     display_maps(fig, dict_fact.components_img_)
     fig.savefig(os.path.join(comp_dir, '../component_fig.pdf'), format='pdf')
     
