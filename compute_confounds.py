@@ -46,18 +46,19 @@ for s in range(len(task_sess)):
         final_sess.append(task_sess[s])
 
 # Some useful directories
-dir_local = os.path.join(home, task, '3mm')
-dir_drago = '/storage/store/data/ibc/derivatives/'
+data_dir = '/storage/store/data/ibc/derivatives/'
 
 # Which data file to use to compute confounds
 filepattern = 'wrdc*.nii.gz'
 
-# Now create a list of movie session files
-movie_dir = os.path.join(home, task, 'derivatives/')
+# Confounds directory and file(s)
+confounds_dir = os.path.join(home, task, 'confounds/')
+if not os.path.isdir(confounds_dir):
+    os.makedirs(confounds_dir)
 confound_file = 'confounds_run' +  str(run).zfill(2) + '.npy'
 
 # Calculate high variance confounds for the data files
-subs = sorted(glob.glob(movie_dir + 'sub*'))
+subs = sorted(glob.glob(data_dir + 'sub*'))
 for s, sub in enumerate(subs):
     # Get data from the sessions in final_sess
     for si, ses in enumerate(final_sess):
