@@ -55,13 +55,13 @@ filepattern = 'wrdc*.nii.gz'
 confounds_dir = os.path.join(home, task, 'confounds/')
 if not os.path.isdir(confounds_dir):
     os.makedirs(confounds_dir)
-confound_file = 'confounds_run' +  str(run).zfill(2) + '.npy'
 
 # Calculate high variance confounds for the data files
 subs = sorted(glob.glob(data_dir + 'sub*'))
 for s, sub in enumerate(subs):
     # Get data from the sessions in final_sess
     for si, ses in enumerate(final_sess):
+        confound_file = 'confounds_run' +  str(ses).zfill(2) + '.npy'
         movie_imgs = sorted(glob.glob(os.path.join(sub, ses) + '/' + filepattern))
         print(movie_imgs)
         # for mi, movie_img in enumerate(movie_imgs):
