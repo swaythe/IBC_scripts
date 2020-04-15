@@ -49,7 +49,7 @@ for s in range(len(task_sess)):
 data_dir = '/storage/store/data/ibc/derivatives/'
 
 # Which data file to use to compute confounds
-filepattern = 'wrdc*.nii.gz'
+filepattern = 'dc*bold.nii.gz'
 
 # Confounds directory and file(s)
 confounds_dir = os.path.join(home, task, 'confounds/')
@@ -59,14 +59,19 @@ if not os.path.isdir(confounds_dir):
 # Calculate high variance confounds for the data files
 subs = sorted(glob.glob(data_dir + 'sub*'))
 for s, sub in enumerate(subs):
-    # Get data from the sessions in final_sess
-    for si, ses in enumerate(final_sess):
-        confound_file = 'confounds_run' +  str(ses).zfill(2) + '.npy'
-        movie_imgs = sorted(glob.glob(os.path.join(sub, ses) + '/' + filepattern))
-        print(movie_imgs)
-        # for mi, movie_img in enumerate(movie_imgs):
-        #     if os.path.isfile(movie_img) and not os.path.isfile(os.path.join(ses, confound_file)):
-        #         movie_imgs_confounds = high_variance_confounds(movie_img)
-        #         np.save(os.path.join(ses, confound_file), movie_imgs_confounds)
-        #     else:
-        #         print('Confounds file already exists')
+    if len(final_sess[s]) > 0:
+        # Get data from the sessions in final_sess
+        for si, ses in enumerate(final_sess[s]):
+            movie_imgs = sorted(glob.glob(os.path.join(sub, ses, 'func/') + filepattern))
+            # print(movie_imgs)
+            for mi, movie_img in enumerate(movie_imgs):
+                if os.path.isfile(movie_img):
+                    if not os.path.isdir(os.path.join(confounds_dir, 'sub-'+str(s).zfill(2), ses)):
+                        os.makedirs(os.path.join(confounds_dir, 'sub-'+str(s).zfill(2), ses))
+                    confound_file = 'confounds_run-' +  str(mi).zfill(2) + '.npy'
+                    if not os.path.isfile(os.path.join(confounds_dir, 'sub-'+str(s).zfill(2), ses, confound_file)):
+                        movie_imgs_confounds = high_variance_confounds(movie_img)
+                        np.save(os.path.join(confounds_dir, 'sub-'+str(s).zfill(2), ses, confound_file), movie_imgs_confounds)
+
+    if s > 0:
+        break
