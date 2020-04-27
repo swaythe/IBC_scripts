@@ -63,7 +63,6 @@ def data_parser(derivatives=DERIVATIVES):
                 sessions.append(session)
                 subjects.append(subject)
                 acquisitions.append(acquisition)
-                print(img)
 
     # create a dictionary with all the information
     db_dict = dict(
@@ -78,7 +77,9 @@ def data_parser(derivatives=DERIVATIVES):
 
 def compute_confound(df):
     df_name = df.split(df)[1]
-    confound_file = 'conf%s.npy' %(df_name.split('.')[0][4:])
+    conf_name = df_name.split('.')[0][4:]
+    print(conf_name)
+    confound_file = 'conf%s.npy' %
     # movie_imgs_confounds = high_variance_confounds(df)
     # np.save(os.path.join(CONFOUND_PATH, confound_file), movie_imgs_confounds)
     print(df)
@@ -90,7 +91,6 @@ if __name__ == '__main__':
     # per-subject high-variance confounds
     for subject in SUBJECTS:
         # Calculate high variance confounds for the data files
-        print(subject)
         data_files = db[db.subject == subject].path
         for dfi, df in enumerate(data_files):
             compute_confound(df)
