@@ -81,7 +81,7 @@ if __name__ == '__main__':
     for subject in SUBJECTS:
         # Calculate high variance confounds for the data files
         print(subject)
-        ses = db[subjects=subject][sessions]
+        ses = db[db.subjects == subject][sessions]
         for s in ses:
             print(ses[s])
         # for si, ses in enumerate(sess):
