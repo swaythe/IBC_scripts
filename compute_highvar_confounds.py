@@ -15,12 +15,10 @@ import matplotlib.pyplot as plt
 DERIVATIVES = '/storage/store/data/ibc/3mm'
 
 sub_no = [1, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15]
-task = 'Raiders'
+TASK = 'Raiders'
 
 sub_path = [os.path.join(DERIVATIVES, 'sub-%02d' % s) for s in sub_no]
 SUBJECTS = [os.path.basename(full_path) for full_path in sub_path]
-
-mem = Memory(cachedir=cache, verbose=0)
 
 def data_parser(derivatives=DERIVATIVES):
     """Generate a dataframe that contains all the data corresponding
@@ -29,6 +27,7 @@ def data_parser(derivatives=DERIVATIVES):
     subjects = []
     sessions = []
     acquisitions = []
+    task = TASK
 
     for sbj in SUBJECTS:
         # fixed-effects activation images
@@ -53,10 +52,10 @@ def data_parser(derivatives=DERIVATIVES):
                     elif part[:3] == 'ses':
                         session = part
                     elif part[:5] == 'task-':
-                        task = part[5:]
+                        task_ = part[5:]
                     elif part[:4] == 'dir-':
                         acquisition = part[4:]
-                if task not in tasks:
+                if task_ not in TASK:
                     continue
                 paths.append(img)
                 sessions.append(session)
