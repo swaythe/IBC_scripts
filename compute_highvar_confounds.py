@@ -17,6 +17,8 @@ DERIVATIVES = '/storage/store/data/ibc/3mm'
 sub_no = [1, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15]
 TASK = 'Raiders'
 
+CONFOUND_PATH = os.path.join('/home/sshankar', TASK, 'confounds')
+
 sub_path = [os.path.join(DERIVATIVES, 'sub-%02d' % s) for s in sub_no]
 SUBJECTS = [os.path.basename(full_path) for full_path in sub_path]
 
@@ -74,6 +76,14 @@ def data_parser(derivatives=DERIVATIVES):
     db = pd.DataFrame().from_dict(db_dict)
     return db
 
+def compute_confound(df):
+    df_name = df.split(df)[1]
+    confound_file = 'conf%s.npy' %(df_name.split('.')[0][4:])
+    # movie_imgs_confounds = high_variance_confounds(df)
+    # np.save(os.path.join(CONFOUND_PATH, confound_file), movie_imgs_confounds)
+    print(df)
+    print(os.path.join(CONFOUND_PATH, confound_file))
+
 if __name__ == '__main__':
     db = data_parser(derivatives=DERIVATIVES)
 
@@ -81,12 +91,6 @@ if __name__ == '__main__':
     for subject in SUBJECTS:
         # Calculate high variance confounds for the data files
         print(subject)
-        ses = db[db.subject == subject][db.session]
-        for s in ses:
-            print(ses[s])
-        # for si, ses in enumerate(sess):
-        #     movie_imgs = sorted(glob.glob(ses + '/' + filepattern))
-        #     for mi, movie_img in enumerate(movie_imgs):
-        #         if os.path.isfile(movie_img) and not os.path.isfile(os.path.join(ses, confound_file)):
-        #             movie_imgs_confounds = high_variance_confounds(movie_img)
-        #             np.save(os.path.join(ses, confound_file), movie_imgs_confounds)
+        data_files = db[db.subject == subject].path
+        for df in enumerate(data_files):
+            compute_confound(df)
