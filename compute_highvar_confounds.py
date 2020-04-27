@@ -77,7 +77,7 @@ def data_parser(derivatives=DERIVATIVES):
     return db
 
 def compute_confound(df):
-    df_name = df.split(df)[1)]
+    df_name = df.split(df)[1]
     confound_file = 'conf%s.npy' %(df_name.split('.')[0][4:])
     # movie_imgs_confounds = high_variance_confounds(df)
     # np.save(os.path.join(CONFOUND_PATH, confound_file), movie_imgs_confounds)
