@@ -18,6 +18,8 @@ sub_no = [1, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15]
 TASK = 'Raiders'
 
 CONFOUND_PATH = os.path.join('/home/sshankar', TASK, 'confounds')
+if not os.path.isdir(CONFOUND_PATH):
+    os.makedirs(CONFOUND_PATH)
 
 sub_path = [os.path.join(DERIVATIVES, 'sub-%02d' % s) for s in sub_no]
 SUBJECTS = [os.path.basename(full_path) for full_path in sub_path]
@@ -79,10 +81,8 @@ def compute_confound(df):
     df_name = os.path.split(df)[1]
     conf_name = (df_name.split('.'))[0][4:]
     confound_file = 'conf%s.npy' %conf_name
-    # movie_imgs_confounds = high_variance_confounds(df)
-    # np.save(os.path.join(CONFOUND_PATH, confound_file), movie_imgs_confounds)
-    # print(df)
-    print(os.path.join(CONFOUND_PATH, confound_file))
+    movie_imgs_confounds = high_variance_confounds(df)
+    np.save(os.path.join(CONFOUND_PATH, confound_file), movie_imgs_confounds)
 
 if __name__ == '__main__':
     db = data_parser(derivatives=DERIVATIVES)
