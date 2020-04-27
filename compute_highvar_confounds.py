@@ -17,7 +17,7 @@ DERIVATIVES = '/storage/store/data/ibc/3mm'
 sub_no = [1, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15]
 TASK = 'Raiders'
 
-CONFOUND_PATH = os.path.join('/home/sshankar', TASK, 'confounds')
+CONFOUND_PATH = os.path.join('/home/parietal/sshankar', TASK, 'confounds')
 if not os.path.isdir(CONFOUND_PATH):
     os.makedirs(CONFOUND_PATH)
 
