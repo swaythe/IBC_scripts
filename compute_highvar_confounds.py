@@ -61,7 +61,7 @@ def data_parser(derivatives=DERIVATIVES):
                 sessions.append(session)
                 subjects.append(subject)
                 acquisitions.append(acquisition)
-                print('task: %s, sub: %s, ses: %s, acq: %s', task, subject, session, acquisition)
+                print(img)
 
     # create a dictionary with all the information
     db_dict = dict(
@@ -81,6 +81,9 @@ if __name__ == '__main__':
     for subject in SUBJECTS:
         # Calculate high variance confounds for the data files
         print(subject)
+        ses = db[subjects=subject][sessions]
+        for s in ses:
+            print(ses[s])
         # for si, ses in enumerate(sess):
         #     movie_imgs = sorted(glob.glob(ses + '/' + filepattern))
         #     for mi, movie_img in enumerate(movie_imgs):
