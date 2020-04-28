@@ -100,7 +100,7 @@ def make_confound_fig(conf_files, nconf, fig_file):
     # Iterate through all sessions
     for cfi,cf in enumerate(conf_files):
         # Load the confound files
-        confounds = np.load(cf, allow_pickle=True)
+        confounds = np.load(os.path.join(CONFOUND_PATH, cf), allow_pickle=True)
         axs[cfi,round(nconf/2)].set_title('Confounds for %s\n', cf)
         for c in range(nconf):
             axs[cfi,c].plot(confounds[:,c], 'b-')
