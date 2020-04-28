@@ -103,10 +103,11 @@ def make_confound_fig(conf_files, nconf, fig_file):
         # Load the confound files
         ses = cf.split('_')
         confounds = np.load(os.path.join(CONFOUND_PATH, cf), allow_pickle=True)
-        axs[cfi,round(nconf/2)].set_title(ses[0][4:])
+        axs[0,round(nconf/2)].set_title(ses[0][4:])
         for c in range(nconf):
             axs[cfi,c].plot(confounds[:,c], 'b-')
-            axs[cfi,c].set_ylabel(ses[-2])
+            if c==0:
+                axs[cfi,c].set_ylabel(ses[-2])
             axs[cfi,c].set_xticklabels(labels=[])
             axs[cfi,c].set_yticklabels(labels=[])
 
