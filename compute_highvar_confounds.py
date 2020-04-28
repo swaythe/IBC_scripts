@@ -21,6 +21,10 @@ CONFOUND_PATH = os.path.join('/home/parietal/sshankar', TASK, 'confounds')
 if not os.path.isdir(CONFOUND_PATH):
     os.makedirs(CONFOUND_PATH)
 
+FIG_PATH = os.path.join('/home/parietal/sshankar', TASK, 'confounds', 'figures')
+if not os.path.isdir(FIG_PATH):
+    os.makedirs(FIG_PATH)
+
 sub_path = [os.path.join(DERIVATIVES, 'sub-%02d' % s) for s in sub_no]
 SUBJECTS = [os.path.basename(full_path) for full_path in sub_path]
 
@@ -77,19 +81,44 @@ def data_parser(derivatives=DERIVATIVES):
     db = pd.DataFrame().from_dict(db_dict)
     return db
 
-def compute_confound(df):
+def compute_confound(df, nconf=5):
+    # Get the part of the file name that has task, sub, ses and acq info
     df_name = os.path.split(df)[1]
-    conf_name = (df_name.split('.'))[0][4:]
-    confound_file = 'conf%s.npy' %conf_name
-    movie_imgs_confounds = high_variance_confounds(df)
+    temp_name = (df_name.split('.'))[0][4:]
+
+    # Compute high variance confounds and save file
+    confound_file = 'conf%s.npy' %temp_name
+    movie_imgs_confounds = high_variance_confounds(df, n_confounds=nconf)
     np.save(os.path.join(CONFOUND_PATH, confound_file), movie_imgs_confounds)
+
+def make_conf_fig(data_files, nconf=5):
+    nses = len(dfs)
+
+    # Plot confounds for all sessions of the subject
+    fig, axs = plt.subplots(nses, nconf, figsize=(nconf*3,10))
+
+    # Iterate through all sessions
+    for dfi, df in enumerate(data_files):
+        # Get the part of the file name that has task, sub, ses and acq info
+        df_name = os.path.split(df)[1]
+        temp_name = (df_name.split('.'))[0][4:]
+
+        # Load the confound files
+        confounds = np.load(df, allow_pickle=True))
+        axs[dfi,round(nconf/2)].set_title('Confounds for %s\n', temp_name)
+        for c in range(nconf):
+            axs[dfi,c].plot(confounds[:,c], 'b-')
+            axs[dfi,c].set_xticklabels(labels=[])
+            axs[dfi,c].set_yticklabels(labels=[])
 
 if __name__ == '__main__':
     db = data_parser(derivatives=DERIVATIVES)
+    nconf = 5
 
     # per-subject high-variance confounds
     for subject in SUBJECTS:
         # Calculate high variance confounds for the data files
         data_files = db[db.subject == subject].path
-        for dfi, df in enumerate(data_files):
-            compute_confound(df)
+        # for dfi, df in enumerate(data_files):
+        #     compute_confound(df)
+        make_conf_fig(data_files)
