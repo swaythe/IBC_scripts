@@ -81,7 +81,7 @@ def data_parser(derivatives=DERIVATIVES):
     db = pd.DataFrame().from_dict(db_dict)
     return db
 
-def compute_confound(df, nconf=5, confound_file):
+def compute_confound(df, nconf, confound_file):
     # Get the part of the file name that has task, sub, ses and acq info
     df_name = os.path.split(df)[1]
     temp_name = (df_name.split('.'))[0][4:]
@@ -91,7 +91,7 @@ def compute_confound(df, nconf=5, confound_file):
     movie_imgs_confounds = high_variance_confounds(df, n_confounds=nconf)
     np.save(os.path.join(CONFOUND_PATH, confound_file), movie_imgs_confounds)
 
-def make_confound_fig(conf_files, nconf=5, fig_file):
+def make_confound_fig(conf_files, nconf, fig_file):
     nses = len(conf_files)
 
     # Plot confounds for all sessions of the subject
