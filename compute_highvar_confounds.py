@@ -119,6 +119,7 @@ if __name__ == '__main__':
 
     # per-subject high-variance confounds
     for subject in SUBJECTS:
+        print(subject)
         # Calculate high variance confounds for the data files
         conf_files = []
         data_files = db[db.subject == subject].path
@@ -128,7 +129,8 @@ if __name__ == '__main__':
             temp_name = (df_name.split('.'))[0][4:]
             confound_file = 'conf%s.npy' %temp_name
             conf_files.append(confound_file)
-            # compute_confound(df, nconf, confound_file)
+            compute_confound(df, nconf, confound_file)
 
         fig_file = '%s.pdf' %subject
         make_confound_fig(conf_files, nconf, fig_file)
+
