@@ -104,7 +104,7 @@ def make_conf_fig(data_files, nconf=5):
         temp_name = (df_name.split('.'))[0][4:]
 
         # Load the confound files
-        confounds = np.load(df, allow_pickle=True))
+        confounds = np.load(df, allow_pickle=True)
         axs[dfi,round(nconf/2)].set_title('Confounds for %s\n', temp_name)
         for c in range(nconf):
             axs[dfi,c].plot(confounds[:,c], 'b-')
