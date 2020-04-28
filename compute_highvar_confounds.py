@@ -92,7 +92,7 @@ def compute_confound(df, nconf=5):
     np.save(os.path.join(CONFOUND_PATH, confound_file), movie_imgs_confounds)
 
 def make_conf_fig(data_files, nconf=5):
-    nses = len(dfs)
+    nses = len(data_files)
 
     # Plot confounds for all sessions of the subject
     fig, axs = plt.subplots(nses, nconf, figsize=(nconf*3,10))
