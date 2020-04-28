@@ -95,7 +95,7 @@ def make_confound_fig(conf_files, nconf, fig_file):
     nses = len(conf_files)
 
     # Plot confounds for all sessions of the subject
-    fig, axs = plt.subplots(nses, nconf, figsize=(nconf*3,10))
+    fig, axs = plt.subplots(nses, nconf, figsize=(nconf*3,10), hspace=0.3)
 
     # Iterate through all sessions
     for cfi,cf in enumerate(conf_files):
