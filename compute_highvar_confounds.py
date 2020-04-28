@@ -95,15 +95,17 @@ def make_confound_fig(conf_files, nconf, fig_file):
     nses = len(conf_files)
 
     # Plot confounds for all sessions of the subject
-    fig, axs = plt.subplots(nses, nconf, figsize=(nconf*3,10), hspace=0.3)
-
+    fig, axs = plt.subplots(nses, nconf, figsize=(nconf*3,10))
+    plt.subplots_adjust(hspace=1)
+    
     # Iterate through all sessions
     for cfi,cf in enumerate(conf_files):
         # Load the confound files
         confounds = np.load(os.path.join(CONFOUND_PATH, cf), allow_pickle=True)
-        axs[cfi,round(nconf/2)].set_title('Confounds for '+ cf + '\n')
+        # axs[cfi,round(nconf/2)].set_title('Confounds for '+ cf + '\n')
         for c in range(nconf):
             axs[cfi,c].plot(confounds[:,c], 'b-')
+            axs[cfi,c].set_ylabel()
             axs[cfi,c].set_xticklabels(labels=[])
             axs[cfi,c].set_yticklabels(labels=[])
 
