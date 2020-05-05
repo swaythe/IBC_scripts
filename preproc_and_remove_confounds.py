@@ -103,8 +103,7 @@ def preprocess(subject, df, confound_file, preproc_file):
 
     # Apply masker and remove high variance confounds
     preproc_array_ = masker.transform(df, confounds=confound_file)
-    if not os.path.isdir(os.path.join(PREPROC_PATH, subject)):
-        os.makedirs(os.path.isdir(os.path.join(PREPROC_PATH, subject)))
+
     np.save(os.path.join(PREPROC_PATH, subject, preproc_file), preproc_array_)
 
 if __name__ == '__main__':
@@ -121,7 +120,12 @@ if __name__ == '__main__':
             # Get the part of the file name that has task, sub, ses and acq info
             df_name = os.path.split(df)[1]
             temp_name = (df_name.split('.'))[0][4:]
-            confound_file = 'conf%s.csv' %temp_name
-            preproc_file = 'preproc%s.npy' %temp_name
+
             # conf_files.append(preproc_file)
+            if not os.path.isdir(os.path.join(PREPROC_PATH, subject)):
+                os.makedirs(os.path.isdir(os.path.join(PREPROC_PATH, subject)))
+            preproc_file = os.path.join(PREPROC_PATH, subject, 'preproc%s.npy' %temp_name)
+
+            confound_file = os.path.join(CONFOUND_PATH, 'conf%s.csv' %temp_name)
+
             preprocess(subject, df, confound_file, preproc_file)
