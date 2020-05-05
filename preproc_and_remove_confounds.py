@@ -25,8 +25,8 @@ if not os.path.isdir(CONFOUND_PATH):
     os.makedirs(CONFOUND_PATH)
 
 PREPROC_PATH = os.path.join('/home/parietal/sshankar', TASK, 'preproc')
-if not os.path.isdir(FIG_PATH):
-    os.makedirs(FIG_PATH)
+if not os.path.isdir(PREPROC_PATH):
+    os.makedirs(PREPROC_PATH)
 
 sub_path = [os.path.join(DERIVATIVES, 'sub-%02d' % s) for s in sub_no]
 SUBJECTS = [os.path.basename(full_path) for full_path in sub_path]
