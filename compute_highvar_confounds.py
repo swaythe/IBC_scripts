@@ -82,14 +82,9 @@ def data_parser(derivatives=DERIVATIVES):
     return db
 
 def compute_confound(df, nconf, confound_file):
-    # Get the part of the file name that has task, sub, ses and acq info
-    df_name = os.path.split(df)[1]
-    temp_name = (df_name.split('.'))[0][4:]
-
     # Compute high variance confounds and save file
-    confound_file = 'conf%s.npy' %temp_name
     movie_imgs_confounds = high_variance_confounds(df, n_confounds=nconf)
-    np.save(os.path.join(CONFOUND_PATH, confound_file), movie_imgs_confounds)
+    np.savetxt(os.path.join(CONFOUND_PATH, confound_file), movie_imgs_confounds)
 
 def make_confound_fig(conf_files, nconf, fig_file):
     nses = len(conf_files)
@@ -102,7 +97,7 @@ def make_confound_fig(conf_files, nconf, fig_file):
     for cfi,cf in enumerate(conf_files):
         # Load the confound files
         ses = cf.split('_')
-        confounds = np.load(os.path.join(CONFOUND_PATH, cf), allow_pickle=True)
+        confounds = np.loadtxt(os.path.join(CONFOUND_PATH, cf))
         axs[0,round(nconf/2)].set_title(ses[0][4:])
         for c in range(nconf):
             axs[cfi,c].plot(confounds[:,c], 'b-')
@@ -127,7 +122,7 @@ if __name__ == '__main__':
             # Get the part of the file name that has task, sub, ses and acq info
             df_name = os.path.split(df)[1]
             temp_name = (df_name.split('.'))[0][4:]
-            confound_file = 'conf%s.npy' %temp_name
+            confound_file = 'conf%s.csv' %temp_name
             conf_files.append(confound_file)
             compute_confound(df, nconf, confound_file)
 
