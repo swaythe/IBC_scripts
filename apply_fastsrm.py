@@ -7,7 +7,7 @@ from joblib import Memory
 from fastsrm.identifiable_srm import IdentifiableFastSRM
 from nilearn.datasets import fetch_atlas_basc_multiscale_2015
 from nilearn.input_data import NiftiMasker
-from nilearn import image, plotting
+from nilearn.image import new_img_like
 import nibabel as nib
 import numpy as np
 import pandas as pd
