@@ -29,7 +29,7 @@ sub_no = [1, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15]
 sub_path = [os.path.join(PREPROC_PATH, 'sub-%02d' % s) for s in sub_no]
 SUBJECTS = [os.path.basename(full_path) for full_path in sub_path]
 
-ses_no = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+SESSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
 # Specify the mask image
 _package_directory = os.path.dirname(os.path.abspath(ibc_public.__file__))
@@ -57,14 +57,16 @@ def data_parser(data_path=PREPROC_PATH):
 
             # If multiple recordings were made of the same session, use the last one
             if len(npy) > 1:
-                npy = npy[-1]
+                npy = [npy[-1]]
 
-            basename = os.path.basename(npy)
+            basename = os.path.basename(npy[0])
             parts = basename.split('_')
+            print(parts)
             task_ = None
             for part in parts:
-                if part[4:7] == 'sub':
+                if part[7:10] == 'sub':
                     subject = part[7:13]
+                    print(subject)
                 elif part[:5] == 'task-':
                     task_ = part[5:]
             if task_ not in TASK:
@@ -76,8 +78,6 @@ def data_parser(data_path=PREPROC_PATH):
     db_dict = dict(
         path=paths,
         subject=subjects,
-        session=sessions,
-        acquisition=acquisitions,
     )
     # create a DataFrame out of the dictionary and write it to disk
     db = pd.DataFrame().from_dict(db_dict)
