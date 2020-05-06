@@ -128,7 +128,7 @@ def get_transformed_atlas():
         # Save the transformed atlas
         if not os.path.exists(ATLAS_PATH):
             os.makedirs(ATLAS_PATH)
-        np.save(os.path.join(atlas_loc, 'atlas_masked.npy'), atlas)
+        np.save(os.path.join(ATLAS_PATH, 'atlas_masked.npy'), atlas)
 
         return atlas
 
@@ -184,6 +184,7 @@ if __name__ == '__main__':
         data_files = db[db.subject == subject].path
         for dfi, df in enumerate(data_files):
             print(df)
-    #         data_.append(np.load(df, allow_pickle=True))
-    #     data.append(np.concatenate(data_))
+            data_.append(np.load(df, allow_pickle=True))
+        data.append(np.concatenate(data_))
+        print(len(data), data[0].shape)
     # apply_fastsrm(data, atlas, n_comp, n_jobs, n_iter, tmp)
