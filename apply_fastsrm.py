@@ -167,7 +167,7 @@ def save_basis_functions(basis_list, n_comp):
                 os.path.join(SRM_PATH, subject, 'basis_list-' + str(i).zfill(2) + '.nii.gz'))
 
 if __name__ == '__main__':
-    db = data_parser(data=PREPROC_PATH)
+    db = data_parser(PREPROC_PATH)
 
     # Specify FastSRM parameters
     atlas = get_transformed_atlas()
@@ -179,6 +179,7 @@ if __name__ == '__main__':
     data = []
 
     for subject in SUBJECTS:
+        print(subject)
         data_ = []
         data_files = db[db.subject == subject].path
         for dfi, df in enumerate(data_files):
