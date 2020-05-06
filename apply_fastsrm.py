@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 
 # ############################### INPUTS ######################################
 
+TASK = 'Raiders'
+
 PREPROC_PATH = os.path.join('/home/parietal/sshankar', TASK, 'preproc')
 ATLAS_PATH = '/home/parietal/sshankar/basc'
 
@@ -27,9 +29,7 @@ sub_no = [1, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15]
 sub_path = [os.path.join(PREPROC_PATH, 'sub-%02d' % s) for s in sub_no]
 SUBJECTS = [os.path.basename(full_path) for full_path in sub_path]
 
-TASK = 'Raiders'
-
-ses_no = [1, 2, 3 4, 5, 6, 7, 8, 9, 10, 11]
+ses_no = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
 # Specify the mask image
 _package_directory = os.path.dirname(os.path.abspath(ibc_public.__file__))
