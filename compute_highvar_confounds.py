@@ -5,7 +5,6 @@ import warnings
 from joblib import Memory
 
 from nilearn.image import high_variance_confounds
-from nilearn import image, plotting
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -128,4 +127,3 @@ if __name__ == '__main__':
 
         fig_file = '%s.pdf' %subject
         make_confound_fig(conf_files, nconf, fig_file)
-

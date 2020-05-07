@@ -4,14 +4,11 @@ import warnings
 
 from joblib import Memory
 
-from nilearn.image import high_variance_confounds
 from nilearn.input_data import NiftiMasker
-from nilearn import image, plotting
 import nibabel as nib
 import numpy as np
 import pandas as pd
 import ibc_public
-import matplotlib.pyplot as plt
 
 # ############################### INPUTS ######################################
 
