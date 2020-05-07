@@ -160,6 +160,27 @@ def apply_fastsrm(srm_data, atlas, n_comp=20, n_jobs=1, n_iter=10, tmp='/home/pa
     fig.savefig(os.path.join(SRM_PATH, '%s_shared-responses.pdf' %task), format='pdf', transparent=False)
     save_basis_functions(fast_srm.basis_list, n_comp)
 
+def save_stuff(data, tmp):
+    bl_files_ = glob.glob(os.path.join(tmp, 'fastsrm*', '*npy')
+
+    basis_lists_ = []
+    basis_lists_.append(bl for bl in bl_files_)
+    print(len(basis_lists_), basis_lists_[0].shape)
+
+    fast_srm = IdentifiableFastSRM(
+        atlas=atlas,
+        n_components=n_comp,
+        n_jobs=n_jobs,
+        n_iter=n_iter,
+        n_iter_reduced=1000,
+        temp_dir=tmp,
+        low_ram=True,
+        aggregate="mean",
+        identifiability='decorr'
+    )
+    fast_srm.basis_list = basis_lists_
+    # shared_resp = fast_srm.transform(data)
+
 def save_basis_functions(basis_list, n_comp):
     # Save the basis lists to subject folders for posterity
     for s, subject in enumerate(SUBJECTS):
@@ -189,4 +210,5 @@ if __name__ == '__main__':
         for df in data_files:
             data_.append(np.load(df, allow_pickle=True))
         data.append(np.concatenate(data_, axis=1))
-    apply_fastsrm(data, atlas, n_comp, n_jobs, n_iter, tmp)
+    # apply_fastsrm(data, atlas, n_comp, n_jobs, n_iter, tmp)
+    save_stuff(data_, tmp)
