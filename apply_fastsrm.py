@@ -8,6 +8,7 @@ from fastsrm.identifiable_srm import IdentifiableFastSRM
 from nilearn.datasets import fetch_atlas_basc_multiscale_2015
 from nilearn.input_data import NiftiMasker
 from nilearn.image import new_img_like
+from nilearn import image
 import nibabel as nib
 import numpy as np
 import pandas as pd
@@ -57,16 +58,16 @@ def data_parser(data_path=PREPROC_PATH):
 
             # If multiple recordings were made of the same session, use the last one
             if len(npy) > 1:
-                npy = [npy[-1]]
+                npy = npy[-1]
+            else:
+                npy = npy[0]
 
-            basename = os.path.basename(npy[0])
+            basename = os.path.basename(npy)
             parts = basename.split('_')
-            print(parts)
             task_ = None
             for part in parts:
                 if part[7:10] == 'sub':
                     subject = part[7:13]
-                    print(subject)
                 elif part[:5] == 'task-':
                     task_ = part[5:]
             if task_ not in TASK:
@@ -132,22 +133,24 @@ def get_transformed_atlas():
 
         return atlas
 
-def apply_fastsrm(db, atlas, n_comp=20, n_jobs=1, n_iter=10, tmp='/home/sshankar/parietal/tmp'):
+def apply_fastsrm(srm_data, atlas, n_comp=20, n_jobs=1, n_iter=10, tmp='/home/parietal/sshankar/tmp'):
     # Fit the FastSRM model with the data
-    fast_srm = FastSRM(
+    fast_srm = IdentifiableFastSRM(
         atlas=atlas,
         n_components=n_comp,
         n_jobs=n_jobs,
         n_iter=n_iter,
+        n_iter_reduced=1000,
         temp_dir=tmp,
         low_ram=True,
         aggregate="mean",
+        identifiability='decorr'
     )
     fast_srm.fit(srm_data)
     shared_resp = fast_srm.transform(srm_data)
 
     # Plot the shared responses
-    fig, axs = plt.subplots(5, sharex=True, sharey=True, figsize=(10,50))
+    fig, axs = plt.subplots(n_comp, sharex=True, sharey=True, figsize=(10,50))
     for i in range(len(shared_resp)):
         axs[i].plot(shared_resp[i,:])
         axs[i].set_title('Shared response #' + str(i+1))
@@ -174,17 +177,16 @@ if __name__ == '__main__':
     n_comp = 20
     n_jobs = 1
     n_iter = 10
-    tmp = '/home/sshankar/parietal/tmp'
+    tmp = '/home/parietal/sshankar/tmp'
+    if not os.path.isdir(tmp):
+        os.makedirs(tmp)
 
     data = []
 
     for subject in SUBJECTS:
-        print(subject)
         data_ = []
         data_files = db[db.subject == subject].path
-        for dfi, df in enumerate(data_files):
-            print(df)
+        for df in data_files:
             data_.append(np.load(df, allow_pickle=True))
-        data.append(np.concatenate(data_))
-        print(len(data), data[0].shape)
-    # apply_fastsrm(data, atlas, n_comp, n_jobs, n_iter, tmp)
+        data.append(np.concatenate(data_, axis=1))
+    apply_fastsrm(data, atlas, n_comp, n_jobs, n_iter, tmp)
