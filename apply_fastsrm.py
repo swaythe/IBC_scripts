@@ -9,7 +9,6 @@ from nilearn.datasets import fetch_atlas_basc_multiscale_2015
 from nilearn.input_data import NiftiMasker
 from nilearn.image import new_img_like
 from nilearn import image
-from shutil import copyfile
 import nibabel as nib
 import numpy as np
 import pandas as pd
@@ -149,19 +148,24 @@ def apply_fastsrm(srm_data, atlas, n_comp=20, n_jobs=1, n_iter=10, tmp='/home/pa
     )
     fast_srm.fit(srm_data)
     shared_resp = fast_srm.transform(srm_data)
+    np.save(os.path.join(SRM_PATH, '%s_shared-responses.npy' %TASK), shared_resp)
 
     # Plot the shared responses
     fig, axs = plt.subplots(n_comp, sharex=True, sharey=True, figsize=(10,50))
     for i in range(len(shared_resp)):
         axs[i].plot(shared_resp[i,:])
         axs[i].set_title('Shared response #' + str(i+1))
+    fig.savefig(os.path.join(SRM_PATH, '%s_shared-responses.pdf' %TASK), format='pdf', transparent=False)
 
-    # Save the shared response matrix and figure
-    np.save(os.path.join(SRM_PATH, '%s_shared-responses.npy' %task), shared_resp)
-    fig.savefig(os.path.join(SRM_PATH, '%s_shared-responses.pdf' %task), format='pdf', transparent=False)
     save_basis_functions(fast_srm.basis_list, n_comp)
 
-def save_stuff(data, basislists, tmp):
+def save_after_fitting(data, tmp):
+    # Use this function if you want to save shared responses at a later date
+    bl_files = glob.glob(os.path.join(tmp, 'fastsrm*', '*npy'))
+    basis_lists = []
+    for i in range(len(bl_files)):
+        basis_lists.append(np.load(bl_files[i]))
+
     fast_srm = IdentifiableFastSRM(
         atlas=atlas,
         n_components=n_comp,
@@ -172,9 +176,8 @@ def save_stuff(data, basislists, tmp):
         aggregate="mean",
         identifiability='decorr'
     )
-    fast_srm.basis_list = basislists
+    fast_srm.basis_list = basis_lists
     shared_resp = fast_srm.transform(data)
-
     np.save(os.path.join(SRM_PATH, '%s_shared-responses.npy' %TASK), shared_resp)
 
     # Plot the shared responses
@@ -182,13 +185,14 @@ def save_stuff(data, basislists, tmp):
     for i in range(len(shared_resp)):
         axs[i].plot(shared_resp[i,:])
         axs[i].set_title('Shared response #' + str(i+1))
-
     fig.savefig(os.path.join(SRM_PATH, '%s_shared-responses.pdf' %TASK), format='pdf', transparent=False)
+
+    save_basis_functions(fast_srm.basis_list, n_comp)
 
 def save_basis_functions(basis_list, n_comp):
     # Save the basis lists to subject folders for posterity
     img_masker = NiftiMasker(mask_img=mask_gm).fit()
-    
+
     for s, subject in enumerate(SUBJECTS):
         bl_ = basis_list[s]
 
@@ -221,13 +225,12 @@ if __name__ == '__main__':
             data_.append(np.load(df, allow_pickle=True))
         data.append(np.concatenate(data_, axis=1))
     # apply_fastsrm(data, atlas, n_comp, n_jobs, n_iter, tmp)
-    
+
     bl_files = glob.glob(os.path.join(tmp, 'fastsrm*', '*npy'))
 
     basis_lists = []
     for i in range(len(bl_files)):
         basis_lists.append(np.load(bl_files[i]))
 
-    # save_stuff(data, basis_lists, tmp)
+    # save_stuff(data, tmp)
     save_basis_functions(basis_lists, n_comp)
-
