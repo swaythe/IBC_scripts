@@ -47,31 +47,21 @@ def data_parser(data_path=SRM_PATH):
 
     for sbj in SUBJECTS:
         # Basis lists as spatial maps
-        bl_name = 'basis_list*.nii.gz' \
-                    % (sbj, task, ses)
-        bl_path = os.path.join(data_path, 'sub-*',
-                                 bl_name)
-        bl = glob.glob(bl_path)
+        bl_name = 'basis_list*.nii.gz'
+        bl_path = os.path.join(SRM_PATH, sbj, bl_name)
+        bl = glob.glob(os.path.join(SRM_PATH, sbj, bl_name))
 
         if not bl:
             msg = 'basis_list*.nii.gz file for task ' + \
                   '%s in %s not found!' % (task, sbj)
             warnings.warn(msg)
 
-        path_parts = os.path.split(img)
+        path_parts = os.path.split(sbj)
         for part in path_parts:
             if part[0:3] == 'sub':
                 subject = part
 
         for img in bl:
-            basename = os.path.basename(img)
-            parts = basename.split('_')
-            task_ = None
-            for part in parts:
-                if part[:5] == 'task-':
-                    task_ = part[5:]
-            if task_ not in TASK:
-                continue
             paths.append(img)
             subjects.append(subject)
 
@@ -103,10 +93,10 @@ def do_second_level(second_level_input, smoothing_fwhm=8, n_comp=20):
 
 if __name__ == '__main__':
     db = data_parser(SRM_PATH)
-    n_comp = len(np.load(db.iloc[0].path))
+    n_comp = len(db[db.subject == 'sub-01'].path)
     smoothing_fwhm = 8
 
-    second_level_input = np.empty((nsub,n_comp), dtype='object')
+    second_level_input = np.empty((len(sub_no),n_comp), dtype='object')
 
     for s, subject in enumerate(SUBJECTS):
         # Let's gather the files that will form the input to the second level analysis

@@ -201,7 +201,7 @@ def save_basis_functions(basis_list, n_comp):
 
         np.save(os.path.join(SRM_PATH, subject, 'basis_list.npy'), bl_)
         for i in range(n_comp):
-            nib.save(img_masker.inverse_transform(bl_),
+            nib.save(img_masker.inverse_transform(bl_[i]),
                 os.path.join(SRM_PATH, subject, 'basis_list-' + str(i).zfill(2) + '.nii.gz'))
 
 if __name__ == '__main__':
