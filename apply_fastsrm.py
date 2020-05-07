@@ -9,6 +9,7 @@ from nilearn.datasets import fetch_atlas_basc_multiscale_2015
 from nilearn.input_data import NiftiMasker
 from nilearn.image import new_img_like
 from nilearn import image
+from shutil import copyfile
 import nibabel as nib
 import numpy as np
 import pandas as pd
@@ -160,34 +161,43 @@ def apply_fastsrm(srm_data, atlas, n_comp=20, n_jobs=1, n_iter=10, tmp='/home/pa
     fig.savefig(os.path.join(SRM_PATH, '%s_shared-responses.pdf' %task), format='pdf', transparent=False)
     save_basis_functions(fast_srm.basis_list, n_comp)
 
-def save_stuff(data, tmp):
-    bl_files_ = glob.glob(os.path.join(tmp, 'fastsrm*', '*npy')
-
-    basis_lists_ = []
-    basis_lists_.append(bl for bl in bl_files_)
-    print(len(basis_lists_), basis_lists_[0].shape)
-
+def save_stuff(data, basislists, tmp):
     fast_srm = IdentifiableFastSRM(
         atlas=atlas,
         n_components=n_comp,
         n_jobs=n_jobs,
         n_iter=n_iter,
         n_iter_reduced=1000,
-        temp_dir=tmp,
         low_ram=True,
         aggregate="mean",
         identifiability='decorr'
     )
-    fast_srm.basis_list = basis_lists_
-    # shared_resp = fast_srm.transform(data)
+    fast_srm.basis_list = basislists
+    shared_resp = fast_srm.transform(data)
+
+    np.save(os.path.join(SRM_PATH, '%s_shared-responses.npy' %TASK), shared_resp)
+
+    # Plot the shared responses
+    fig, axs = plt.subplots(n_comp, sharex=True, sharey=True, figsize=(10,50))
+    for i in range(len(shared_resp)):
+        axs[i].plot(shared_resp[i,:])
+        axs[i].set_title('Shared response #' + str(i+1))
+
+    fig.savefig(os.path.join(SRM_PATH, '%s_shared-responses.pdf' %TASK), format='pdf', transparent=False)
 
 def save_basis_functions(basis_list, n_comp):
     # Save the basis lists to subject folders for posterity
+    img_masker = NiftiMasker(mask_img=mask_gm).fit()
+    
     for s, subject in enumerate(SUBJECTS):
         bl_ = basis_list[s]
-        copyfile(bl_, os.path.join(SRM_PATH, subject, 'basis_list.npy'))
+
+        if not os.path.isdir(os.path.join(SRM_PATH, subject)):
+            os.makedirs(os.path.join(SRM_PATH, subject))
+
+        np.save(os.path.join(SRM_PATH, subject, 'basis_list.npy'), bl_)
         for i in range(n_comp):
-            nib.save(img_masker.inverse_transform(bls[i]),
+            nib.save(img_masker.inverse_transform(bl_),
                 os.path.join(SRM_PATH, subject, 'basis_list-' + str(i).zfill(2) + '.nii.gz'))
 
 if __name__ == '__main__':
@@ -211,4 +221,13 @@ if __name__ == '__main__':
             data_.append(np.load(df, allow_pickle=True))
         data.append(np.concatenate(data_, axis=1))
     # apply_fastsrm(data, atlas, n_comp, n_jobs, n_iter, tmp)
-    save_stuff(data_, tmp)
+    
+    bl_files = glob.glob(os.path.join(tmp, 'fastsrm*', '*npy'))
+
+    basis_lists = []
+    for i in range(len(bl_files)):
+        basis_lists.append(np.load(bl_files[i]))
+
+    # save_stuff(data, basis_lists, tmp)
+    save_basis_functions(basis_lists, n_comp)
+
