@@ -23,12 +23,8 @@ import matplotlib.pyplot as plt
 TASK = 'Raiders'
 
 SRM_PATH = os.path.join('/home/parietal/sshankar', TASK, 'fastsrm')
-if not os.path.isdir(SRM_PATH):
-    os.makedirs(SRM_PATH)
 
-GROUP_LEVEL_PATH = os.path.join('/home/parietal/sshankar', TASK, 'fastsrm', 'group_level')
-if not os.path.isdir(GROUP_LEVEL_PATH):
-    os.makedirs(GROUP_LEVEL_PATH)
+GROUP_LEVEL_PATH = SRM_PATH
 
 sub_no = [1, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15]
 sub_path = [os.path.join(SRM_PATH, 'sub-%02d' % s) for s in sub_no]
@@ -74,7 +70,7 @@ def data_parser(data_path=SRM_PATH):
     db = pd.DataFrame().from_dict(db_dict)
     return db
 
-def do_second_level(second_level_input, smoothing_fwhm=8, n_comp=20):
+def do_second_level(second_level_input, smoothing_fwhm, n_comp=20):
     # Construct a design matrix. We are including all subjects and
     # essentially finding the "main effects" of the contrasts performed
     # in the first level analysis
@@ -89,12 +85,20 @@ def do_second_level(second_level_input, smoothing_fwhm=8, n_comp=20):
         nib.save(new_img_like(mask_gm, z_map.get_fdata()),
                  os.path.join(GROUP_LEVEL_PATH, 'component-%02d.nii.gz' %i))
         report = make_glm_report(second_level_model, 'intercept')
-        report.save_as_html(os.path.join(GROUP_LEVEL_PATH, 'component-%02d.html' % i))
+        report.save_as_html(os.path.join(GROUP_LEVEL_PATH, 'component-%02d.html' % (i+1)))
 
 if __name__ == '__main__':
+    ident = 'ica'
+    n_comp = 20
+
+    SRM_PATH = os.path.join(SRM_PATH, ident, 'ncomp_%d' %n_comp)
+
+    GROUP_LEVEL_PATH = os.path.join(SRM_PATH, 'group_level', 'no_smooth')
+    if not os.path.isdir(GROUP_LEVEL_PATH):
+        os.makedirs(GROUP_LEVEL_PATH)
+
     db = data_parser(SRM_PATH)
-    n_comp = len(db[db.subject == 'sub-01'].path)
-    smoothing_fwhm = 8
+    smoothing_fwhm = None
 
     second_level_input = np.empty((len(sub_no),n_comp), dtype='object')
 

@@ -23,8 +23,6 @@ PREPROC_PATH = os.path.join('/home/parietal/sshankar', TASK, 'preproc')
 ATLAS_PATH = '/home/parietal/sshankar/basc'
 
 SRM_PATH = os.path.join('/home/parietal/sshankar', TASK, 'fastsrm')
-if not os.path.isdir(SRM_PATH):
-    os.makedirs(SRM_PATH)
 
 sub_no = [1, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15]
 sub_path = [os.path.join(PREPROC_PATH, 'sub-%02d' % s) for s in sub_no]
@@ -133,7 +131,7 @@ def get_transformed_atlas():
 
         return atlas
 
-def apply_fastsrm(srm_data, atlas, n_comp=20, n_jobs=1, n_iter=10, tmp='/home/parietal/sshankar/tmp'):
+def apply_fastsrm(srm_data, atlas, n_comp=20, n_jobs=1, n_iter=10, tmp='/home/parietal/sshankar/tmp', ident='ica'):
     # Fit the FastSRM model with the data
     fast_srm = IdentifiableFastSRM(
         atlas=atlas,
@@ -144,10 +142,11 @@ def apply_fastsrm(srm_data, atlas, n_comp=20, n_jobs=1, n_iter=10, tmp='/home/pa
         temp_dir=tmp,
         low_ram=True,
         aggregate="mean",
-        identifiability='decorr'
+        identifiability=ident
     )
     fast_srm.fit(srm_data)
     shared_resp = fast_srm.transform(srm_data)
+
     np.save(os.path.join(SRM_PATH, '%s_shared-responses.npy' %TASK), shared_resp)
 
     # Plot the shared responses
@@ -159,13 +158,8 @@ def apply_fastsrm(srm_data, atlas, n_comp=20, n_jobs=1, n_iter=10, tmp='/home/pa
 
     save_basis_functions(fast_srm.basis_list, n_comp)
 
-def save_after_fitting(data, tmp):
-    # Use this function if you want to save shared responses at a later date
-    bl_files = glob.glob(os.path.join(tmp, 'fastsrm*', '*npy'))
-    basis_lists = []
-    for i in range(len(bl_files)):
-        basis_lists.append(np.load(bl_files[i]))
-
+def save_after_fitting(basis_lists, n_comp, ident):
+    # Use this function if you want to generate and save shared responses at a later date
     fast_srm = IdentifiableFastSRM(
         atlas=atlas,
         n_components=n_comp,
@@ -174,10 +168,11 @@ def save_after_fitting(data, tmp):
         n_iter_reduced=1000,
         low_ram=True,
         aggregate="mean",
-        identifiability='decorr'
+        identifiability=ident
     )
     fast_srm.basis_list = basis_lists
     shared_resp = fast_srm.transform(data)
+
     np.save(os.path.join(SRM_PATH, '%s_shared-responses.npy' %TASK), shared_resp)
 
     # Plot the shared responses
@@ -209,12 +204,17 @@ if __name__ == '__main__':
 
     # Specify FastSRM parameters
     atlas = get_transformed_atlas()
-    n_comp = 20
+    n_comp = 50
     n_jobs = 1
     n_iter = 10
     tmp = '/home/parietal/sshankar/tmp'
+    ident = 'ica'
     if not os.path.isdir(tmp):
         os.makedirs(tmp)
+
+    SRM_PATH = os.path.join(SRM_PATH, ident, 'ncomp_%d' %n_comp)
+    if not os.path.isdir(SRM_PATH):
+        os.makedirs(SRM_PATH)
 
     data = []
 
@@ -224,13 +224,13 @@ if __name__ == '__main__':
         for df in data_files:
             data_.append(np.load(df, allow_pickle=True))
         data.append(np.concatenate(data_, axis=1))
-    # apply_fastsrm(data, atlas, n_comp, n_jobs, n_iter, tmp)
+    apply_fastsrm(data, atlas, n_comp, n_jobs, n_iter, tmp, ident)
 
-    bl_files = glob.glob(os.path.join(tmp, 'fastsrm*', '*npy'))
+    # Uncomment the lines below if you want to save data at a later date
+    # bl_files = glob.glob(os.path.join(tmp, 'fastsrm*', '*npy'))
 
-    basis_lists = []
-    for i in range(len(bl_files)):
-        basis_lists.append(np.load(bl_files[i]))
+    # basis_lists = []
+    # for i in range(len(bl_files)):
+    #     basis_lists.append(np.load(bl_files[i]))
 
-    # save_stuff(data, tmp)
-    save_basis_functions(basis_lists, n_comp)
+    # save_after_fitting(basis_lists, n_comp, ident)
