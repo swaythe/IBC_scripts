@@ -232,6 +232,8 @@ def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
 
     # Concatenate images
     dc_imgs = sorted(glob.glob(os.path.join(data_dir, '*run*dwi.nii.gz')))
+    # print(dc_imgs)
+    dc_img = os.path.join(dwi_dir, '%s_%s_dwi.nii.gz' % (subject, session))
     # nib.nifti1.save(nib.funcs.concat_images(dc_imgs, axis=3), dc_img)
 
     # Concatenate the bval and bvec files as well
