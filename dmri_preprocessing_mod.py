@@ -46,7 +46,8 @@ To implement:
 3. Distortion correction (topup, FSL)
     One can feed the output from topup into the eddy tool
 4. Eddy current and motion correction (eddy, FSL)
-5. Bias correction (FAST, FSL)
+5. Bias correction (dwibiascorrect, ANTS via MRTrix3)
+6. Register DWI images to each other and then to T1 (flirt and epi_reg, FSL)
 
 Currently draft version with hard coded paths etc.
 Author: Bertrand Thirion, 2015
@@ -61,6 +62,7 @@ import nibabel as nib
 from nilearn.masking import compute_epi_mask
 from ibc_public.utils_pipeline import fsl_topup
 from dipy.segment.mask import median_otsu
+from dipy.align import register_dwi_series, register_dwi_to_template
 from dipy.reconst.dti import TensorModel, fractional_anisotropy
 from dipy.reconst.csdeconv import ConstrainedSphericalDeconvModel
 from dipy.direction import peaks_from_model
@@ -225,6 +227,7 @@ def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
     write_dir = os.path.join(derivatives_dir, subject, session)
     dwi_dir = os.path.join(write_dir, 'dwi')
     outfmap_dir = os.path.join(write_dir, 'fmap')
+    outanat_dir = os.path.join(write_dir, 'anat')
 
     # Extract T1w brain
     t1_img = glob.glob('%s/sub*T1w.nii.gz' % anat_dir)[0]
@@ -308,56 +311,60 @@ def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
     # Now run eddy to correct eddy current distortions
     mask_img = glob.glob('%s/*mask.nii.gz' % outfmap_dir)[0]
 
-    # eddy_out = os.path.join(dwi_dir, 'eddy_denoise')
-    # # This command uses the denoised images as input
+    eddy_out = os.path.join(dwi_dir, 'eddy_denoise')
+    # # This command uses the denoised images as input and corrects for
+    # # susceptibility-by-movement interactions
     # cmd = "eddy --imain=%s --mask=%s --acqp=%s --index=%s --bvecs=%s --bvals=%s --topup=%s --repol --out=%s" % (
     #     dn_img, mask_img, acq_params_file, index_file, bvecs_out, bvals_out, topup_results_basename, eddy_out)
 
-    eddy_out = os.path.join(dwi_dir, 'eddy_degibbs')
-    # This command uses the degibbsed images as input
-    cmd = "eddy --imain=%s --mask=%s --acqp=%s --index=%s --bvecs=%s --bvals=%s --topup=%s --repol --out=%s" % (
-        dg_img, mask_img, acq_params_file, index_file, bvecs_out, bvals_out, topup_results_basename, eddy_out)
+    # eddy_out = os.path.join(dwi_dir, 'eddy_degibbs')
+    # This command uses the degibbsed images as input and corrects for
+    # susceptibility-by-movement interactions
+    # cmd = "eddy --imain=%s --mask=%s --acqp=%s --index=%s --bvecs=%s --bvals=%s --topup=%s --repol --out=%s" % (
+    #     dg_img, mask_img, acq_params_file, index_file, bvecs_out, bvals_out, topup_results_basename, eddy_out)
+    #
+    # print(cmd)
+    # os.system(cmd)
+
+    # Bias field correction
+
+    # Correct for negative values and values close to 0 prior to bias correction
+    # For more details see ANTs documentation for N4BiasFieldCorrection
+    # eddy_out = glob.glob('%s/eddy_denoise.nii.gz' % dwi_dir)[0]
+    # img_ = nib.load(eddy_out)
+    # data_ = img_.get_fdata()
+    # min_val = np.min(np.min(np.min(data_)))
+    # data_ = data_ + np.abs(min_val) + (0.1 * np.abs(min_val))
+    #
+    # nonneg_file = os.path.join(dwi_dir, 'nn_eddy_denoise.nii.gz')
+    # nib.save(nib.Nifti1Image(data_, img_.affine), nonneg_file)
+
+    eddy_out = glob.glob('%s/nn_eddy_denoise.nii.gz' % dwi_dir)[0]
+    bf_out = os.path.join(dwi_dir, 'bf_nn_eddy_denoise.nii.gz')
+    # cmd = "dwibiascorrect ants %s %s -mask %s -fslgrad %s %s" % (
+    #     eddy_out, bf_out, mask_img, bvecs_out, bvals_out)
+    #
+    # print(cmd)
+    # os.system(cmd)
+
+    # Align DWI images to first b0 volume
+    coreg_bf = os.path.join(dwi_dir, "coreg_bf_nn_eddy_denoise")
+    # cmd = "mcflirt -in %s -refvol 0 -out %s -mats" % (
+    #     bf_out, coreg_bf)
+    # print(cmd)
+    # os.system(cmd)
+
+    # Align DWI images to T1w image
+    align_dwi_fname = glob.glob('%s/coreg_bf_nn_eddy_denoise.nii.gz' % dwi_dir)[0]
+    template = glob.glob('%s/*T1w*' % anat_dir)[0]
+    brain = glob.glob('%s/*bet.nii.gz*' % outanat_dir)[0]
+    t1_aligned = os.path.join(dwi_dir, 't1_aligned_dwi')
+    cmd = "epi_reg --epi=%s --t1=%s --t1brain=%s --out=%s" % (
+        coreg_bf, template, brain, t1_aligned)
 
     print(cmd)
     os.system(cmd)
 
-    # # Apply topup to the images
-    # input_imgs = sorted(glob.glob('%s/sub*.nii.gz' % data_dir))
-    # dc_imgs = sorted(glob.glob(os.path.join(dwi_dir, 'dcsub*run*.nii.gz')))
-    # # mem = Memory('/neurospin/tmp/bthirion/cache_dir')
-    # if len(dc_imgs) < len(input_imgs):
-    #     se_maps = [
-    #         os.path.join(fmap_dir, '%s_%s_dir-ap_epi.nii.gz' % (subject, session)),
-    #         os.path.join(fmap_dir, '%s_%s_dir-pa_epi.nii.gz' % (subject, session))]
-    #
-    #     if do_topup:
-    #         fsl_topup(se_maps, input_imgs, mem, write_dir, 'dwi')
-    #
-    # # Then proceeed with Eddy current correction
-    # # get the images
-    # dc_imgs = sorted(glob.glob(os.path.join(dwi_dir, 'dc*run*.nii.gz')))
-    # dc_img = os.path.join(dwi_dir, 'dc%s_%s_dwi.nii.gz' % (subject, session))
-    # concat_images(dc_imgs, dc_img)
-    #
-    # # get the bvals/bvec
-    # file_bvals = sorted(glob.glob('%s/sub*.bval' % data_dir))
-    # bvals = np.concatenate([np.loadtxt(fbval) for fbval in sorted(file_bvals)])
-    # bvals_file = os.path.join(dwi_dir, 'dc%s_%s_dwi.bval' % (subject, session))
-    # np.savetxt(bvals_file, bvals)
-    # file_bvecs = sorted(glob.glob('%s/sub*.bvec' % data_dir))
-    # bvecs = np.hstack([np.loadtxt(fbvec) for fbvec in sorted(file_bvecs)])
-    # bvecs_file = os.path.join(dwi_dir, 'dc%s_%s_dwi.bvec' % (subject, session))
-    # np.savetxt(bvecs_file, bvecs)
-    #
-    # # Get eddy-preprocessed images
-    # # eddy_img = nib.load(glob.glob(os.path.join(dwi_dir, 'eddc*.nii*'))[-1])
-    #
-    # # Get eddy-preprocessed images
-    # eddy_img = mem.cache(eddy_current_correction)(
-    #     dc_img, bvals_file, bvecs_file, dwi_dir, mem)
-    #
-    # # load the data
-    # gtab = gradient_table(bvals, bvecs, b0_threshold=10)
     # # Create a brain mask
     #
     # from dipy.segment.mask import median_otsu
