@@ -46,7 +46,7 @@ To implement:
 3. Distortion correction (topup, FSL)
     One can feed the output from topup into the eddy tool
 4. Eddy current and motion correction (eddy, FSL)
-5. Bias correction (dwibiascorrect, ANTS via MRTrix3)
+5. Bias correction (dwibiascorrect, ANTS via MRTrix3 - not working well, skipping this step)
 6. Register DWI images to each other and then to T1 (flirt and epi_reg, FSL)
 
 Currently draft version with hard coded paths etc.
@@ -59,7 +59,6 @@ import glob
 from joblib import Memory, Parallel, delayed
 import numpy as np
 import nibabel as nib
-from nilearn.masking import compute_epi_mask
 from ibc_public.utils_pipeline import fsl_topup
 from dipy.segment.mask import median_otsu
 from dipy.align import register_dwi_series, register_dwi_to_template
@@ -86,248 +85,85 @@ def extract_brain(t1_img, out_dir, subject, session):
     print(cmd)
     os.system(cmd)
 
-def eddy_current_correction(img, file_bvals, file_bvecs, write_dir, mem,
-                            acqp='b0_acquisition_params_AP.txt'):
-    """ Perform Eddy current correction on diffusion data
-    Todo: do topup + eddy in one single command
-    """
-    import nibabel as nib
-    bvals = np.loadtxt(file_bvals)
-    mean_img = get_mean_unweighted_image(nib.load(img), bvals)
-    mean_img.to_filename(os.path.join(write_dir, 'mean_unweighted.nii.gz'))
-    mask = compute_epi_mask(mean_img)
-    mask_file = os.path.join(write_dir, 'mask.nii.gz')
-    nib.save(mask, mask_file)
-    corrected = os.path.join(os.path.dirname(img),
-                             'ed' + os.path.basename(img))
-    index = np.ones(len(bvals), np.uint8)
-    index_file = os.path.join(write_dir, 'index.txt')
-    np.savetxt(index_file, index)
-    cmd = 'fsl5.0-eddy_correct --acqp=%s --bvals=%s --bvecs=%s --imain=%s '\
-          '--index=%s --mask=%s --out=%s' % (
-           acqp, file_bvals, file_bvecs, img, index_file, mask_file, corrected)
-    cmd = 'fsl5.0-eddy_correct %s %s %d' % (img, corrected, 0)
+def concat_images(in_imgs, out_img):
+    nib.nifti1.save(nib.funcs.concat_images(in_imgs, axis=3), out_img)
+
+def concat_bvals(in_bvals, out_bvals):
+    bvals_ = np.loadtxt(in_bvals[0], dtype=int)
+    for i in range(len(in_bvals)-1):
+        bv = np.loadtxt(in_bvals[i+1], dtype=int)
+        bvals_ = np.concatenate((bvals_,bv))
+    np.savetxt(out_bvals, bvals_, fmt='%d', newline=' ')
+
+def concat_bvecs(in_bvecs, out_bvecs):
+    bvecs_ = np.loadtxt(in_bvecs[0])
+    for i in range(len(in_bvecs)-1):
+        bv = np.loadtxt(in_bvecs[i+1])
+        bvecs_ = np.concatenate((bvecs_,bv), axis=1)
+    np.savetxt(out_bvecs, bvecs_)
+
+def denoise_dwi(in_dn, out_dn):
+    cmd = 'dwidenoise %s %s' % (in_dn, out_dn)
     print(cmd)
     os.system(cmd)
-    return nib.load(corrected)
 
+def degibbs_dwi(in_dg, out_dg):
+    cmd = 'mrdegibbs %s %s' % (in_dg, out_dg)
+    print(cmd)
+    os.system(cmd)
 
-def length(streamline):
-    """ Compute the length of streamlines"""
-    n = streamline.shape[0] // 2
-    return np.sqrt((
-        (streamline[0] - streamline[n]) ** 2 +
-        (streamline[-1] - streamline[n]) ** 2).sum())
+def collate_b0s(dwi_img, vols=[0, 61, 122, 183], merged_b0_img):
+    cmd = "fslroi %s %s %d 1" % (b0_imgs, vols[0], merged_b0_img)
+    print(cmd)
+    os.system(cmd)
+    cmd = "fslroi %s temp_vol %d 1" % (b0_imgs, vols[1])
+    print(cmd)
+    os.system(cmd)
+    cmd = "fslmerge -t %s %s temp_vol" % (merged_b0_img, merged_b0_img)
+    print(cmd)
+    os.system(cmd)
+    cmd = "fslroi %s temp_vol %d 1" % (b0_imgs, vols[2])
+    print(cmd)
+    os.system(cmd)
+    cmd = "fslmerge -t %s %s temp_vol" % (merged_b0_img, merged_b0_img)
+    print(cmd)
+    os.system(cmd)
+    cmd = "fslroi %s temp_vol %d 1" % (b0_imgs, vols[0])
+    print(cmd)
+    os.system(cmd)
+    cmd = "fslmerge -t %s %s temp_vol" % (merged_b0_img, merged_b0_img)
+    print(cmd)
+    os.system(cmd)
 
+def calc_topup(merged_b0_img, acq_params_file, hifi_file, topup_results_basename):
+    cmd = "topup --imain=%s --datain=%s --config=b02b0.cnf --out=%s --iout=%s" % (
+        merged_b0_img, acq_params_file, topup_results_basename, hifi_file)
+    print(cmd)
+    os.system(cmd)
 
-def filter_according_to_length(streamlines, threshold=30):
-    """Remove streamlines shorter than the predefined threshold """
-    print(len(streamlines))
-    for i in range(len(streamlines) - 1, 0, -1):
-        if length(streamlines[i]) < threshold:
-            streamlines.pop(i)
+def make_hifi_mask(hifi_file, threshold=0.67, hifi_brain):
+    cmd = "fslmaths %s -Tmean temp" % (hifi_file)
+    print(cmd)
+    os.system(cmd)
 
-    print(len(streamlines))
-    return streamlines
+    cmd = "bet temp %s -f %f -R -m" % (hifi_file, hifi_brain, threshold)
+    print(cmd)
+    os.system(cmd)
 
+def run_eddy(eddy_in, mask_img, acq_params_file, index_file, out_bvecs, out_bvals, topup_results_basename, eddy_out):
+    cmd = "eddy --imain=%s --mask=%s --acqp=%s --index=%s --bvecs=%s --bvals=%s --topup=%s --repol --out=%s" % (
+        eddy_in, mask_img, acq_params_file, index_file, out_bvecs, out_bvals, topup_results_basename, eddy_out)
 
-def adapt_ini_file(template, subject, session):
-    """ Adapt an ini file by changing the subject and session"""
-    output_name = os.path.join(
-        '/tmp', os.path.basename(template)[:- 4] + '_' + subject + '_'
-        + session + '.ini')
-    f1 = open(template, 'r')
-    f2 = open(output_name, 'w')
-    for line in f1.readlines():
-        f2.write(line.replace('sub-01', subject).replace('ses-01', session))
+    print(cmd)
+    os.system(cmd)
 
-    f1.close()
-    f2.close()
-    return output_name
+def extract_and_mask_eddy_b0(eddy_out, b0_vol, b0_mask):
+    cmd = "fslroi %s %s 0 1" % (eddy_out, b0_vol)
+    print(cmd)
+    os.system(cmd)
+    # Masking TBD
 
-
-def get_mean_unweighted_image(img, bvals):
-    """ Create an average diffusion image from the most weakly weighted images
-    for registration"""
-    X = img.get_data().T[bvals < 50].T
-    return nib.Nifti1Image(X.mean(-1), img.affine)
-
-
-def visualization(streamlines_file):
-    # clustering of fibers into bundles and visualization thereof
-    streamlines = np.load(streamlines_file)['arr_0']
-    qb = QuickBundles(streamlines, dist_thr=10., pts=18)
-    centroids = qb.centroids
-    colors = line_colors(centroids).astype(np.float)
-    mlab.figure(bgcolor=(0., 0., 0.))
-    for streamline, color in zip(centroids, colors):
-        mlab.plot3d(streamline.T[0], streamline.T[1], streamline.T[2],
-                    line_width=1., tube_radius=.5, color=tuple(color))
-
-    figname = streamlines_file[:-3] + 'png'
-    mlab.savefig(figname)
-    print(figname)
-    mlab.close()
-
-
-def tractography(img, gtab, mask, dwi_dir, do_viz=True):
-    data = img.get_data()
-    # dirty imputation
-    data[np.isnan(data)] = 0
-    # Diffusion model
-    csd_model = ConstrainedSphericalDeconvModel(gtab, response=None)
-
-    sphere = get_sphere('symmetric724')
-    csd_peaks = peaks_from_model(
-        model=csd_model, data=data, sphere=sphere, mask=mask,
-        relative_peak_threshold=.5, min_separation_angle=25,
-        parallel=False)
-
-    # FA values to stop the tractography
-    tensor_model = TensorModel(gtab, fit_method='WLS')
-    tensor_fit = tensor_model.fit(data, mask)
-    fa = fractional_anisotropy(tensor_fit.evals)
-    stopping_values = np.zeros(csd_peaks.peak_values.shape)
-    stopping_values[:] = fa[..., None]
-
-    # tractography
-    streamline_generator = EuDX(stopping_values,
-                                csd_peaks.peak_indices,
-                                seeds=10**6,
-                                odf_vertices=sphere.vertices,
-                                a_low=0.1)
-
-    streamlines = [streamline for streamline in streamline_generator]
-    streamlines = filter_according_to_length(streamlines)
-    np.savez(os.path.join(dwi_dir, 'streamlines.npz'), streamlines)
-
-    #  write the result as images
-    hdr = nib.trackvis.empty_header()
-    hdr['voxel_size'] = img.header.get_zooms()[:3]
-    hdr['voxel_order'] = 'LAS'
-    hdr['dim'] = fa.shape[:3]
-
-    csd_streamlines_trk = ((sl, None, None) for sl in streamlines)
-    csd_sl_fname = os.path.join(dwi_dir, 'csd_streamline.trk')
-    nib.trackvis.write(csd_sl_fname, csd_streamlines_trk, hdr,
-                       points_space='voxel')
-    fa_image = os.path.join(dwi_dir, 'fa_map.nii.gz')
-    nib.save(nib.Nifti1Image(fa, img.affine), fa_image)
-    if 1:
-        visualization(os.path.join(dwi_dir, 'streamlines.npz'))
-
-    return streamlines
-
-
-def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
-    subject, session = subject_session
-    anat_dir = os.path.join(source_dir, subject, session, 'anat')
-    data_dir = os.path.join(source_dir, subject, session, 'dwi')
-    fmap_dir = os.path.join(source_dir, subject, session, 'fmap')
-    write_dir = os.path.join(derivatives_dir, subject, session)
-    dwi_dir = os.path.join(write_dir, 'dwi')
-    outfmap_dir = os.path.join(write_dir, 'fmap')
-    outanat_dir = os.path.join(write_dir, 'anat')
-
-    # Extract T1w brain
-    t1_img = glob.glob('%s/sub*T1w.nii.gz' % anat_dir)[0]
-    # extracted = extract_brain(t1_img, write_dir, subject, session)
-
-    # Concatenate images
-    dc_imgs = sorted(glob.glob(os.path.join(data_dir, '*run*dwi.nii.gz')))
-    # print(dc_imgs)
-    dc_img = os.path.join(dwi_dir, '%s_%s_dwi.nii.gz' % (subject, session))
-    # nib.nifti1.save(nib.funcs.concat_images(dc_imgs, axis=3), dc_img)
-
-    # Concatenate the bval and bvec files as well
-    # bval_files = sorted(glob.glob(os.path.join(data_dir, '*run*dwi.bval')))
-    bvals_out = os.path.join(dwi_dir, "bvals")
-    # bvals_ = np.loadtxt(bval_files[0], dtype=int)
-    # for i in range(len(bval_files)-1):
-    #     bv = np.loadtxt(bval_files[i+1], dtype=int)
-    #     bvals_ = np.concatenate((bvals_,bv))
-    # np.savetxt(bvals_out, bvals_, fmt='%d', newline=' ')
-
-    # bvec_files = sorted(glob.glob(os.path.join(data_dir, '*run*dwi.bvec')))
-    bvecs_out = os.path.join(dwi_dir, "bvecs")
-    # bvecs_ = np.loadtxt(bvec_files[0])
-    # for i in range(len(bvec_files)-1):
-    #     bv = np.loadtxt(bvec_files[i+1])
-    #     bvecs_ = np.concatenate((bvecs_,bv), axis=1)
-    # np.savetxt(bvecs_out, bvecs_)
-
-
-    # Denoise images using MP-PCA
-    dn_img = os.path.join(dwi_dir, '%s_%s_dwi-denoise.nii.gz' % (subject, session))
-    # cmd = 'dwidenoise %s %s' % (dc_img, dn_img)
-    # print(cmd)
-    # os.system(cmd)
-
-    # Remove Gibbs ringing artifacts
-    # The recommendation is to do this if not using partial Fourier acquisition, but we do use it.
-    # The images look a little blurred and of lower intensity than the denoised images
-    dg_img = os.path.join(dwi_dir, '%s_%s_dwi-degibbs.nii.gz' % (subject, session))
-    # cmd = 'mrdegibbs %s %s' % (dn_img, dg_img)
-    # print(cmd)
-    # os.system(cmd)
-
-    # Run FSL topup
-    fmap_imgs = sorted(glob.glob('%s/sub*dir*epi.nii.gz' % fmap_dir))
-    merged_img = os.path.join(outfmap_dir, '%s_%s_dir-appa_epi.nii.gz' % (subject, session))
-    # if len(fmap_imgs)==2:
-    #     cmd = "fslmerge -t %s %s %s" % (
-    #         merged_img, fmap_imgs[0], fmap_imgs[1])
-    #     print(cmd)
-    #     os.system(cmd)
-    # else:
-    #     print("There are more than 2 SE files, can't proceed")
-
-    acq_params_file = os.path.join(fmap_dir, 'b0_acquisition_params.txt')
-    topup_results_basename = os.path.join(outfmap_dir, 'topup_result')
-    hifi_file = os.path.join(outfmap_dir, 'hifi_b0')
-    # cmd = "topup --imain=%s --datain=%s --config=b02b0.cnf --out=%s --iout=%s" % (
-    #     merged_img, acq_params_file, topup_results_basename, hifi_file)
-    # print(cmd)
-    # os.system(cmd)
-
-    # Calculate the mean image of the hifi_file and etract the brain from it before running eddy
-    # cmd = "fslmaths %s -Tmean %s" % (hifi_file, hifi_file)
-    # print(cmd)
-    # os.system(cmd)
-
-    hifi_file_brain = os.path.join(outfmap_dir, 'hifi_b0_brain')
-    # cmd = "bet %s %s -f 0.85 -R -m" % (hifi_file, hifi_file_brain)
-    # print(cmd)
-    # os.system(cmd)
-
-    # Create a text file that contains, for each volume in the concatenated dwi images file,
-    # the corresponding line of the acquisitions parameter file. The way the data has been
-    # concatenated, we have 2 AP runs followed by 2 PA runs, each with 61 volumes. Thus, the
-    # text file will have 244 lines, the first 122 will say "1" and the last 122 will say "2"
-    index_file = os.path.join(dwi_dir, 'index.txt')
-    # inds = np.concatenate((np.ones(122, dtype=int), np.ones(122, dtype=int)*2))
-    # np.savetxt(index_file, inds, fmt='%d')
-
-    # Now run eddy to correct eddy current distortions
-    mask_img = glob.glob('%s/*mask.nii.gz' % outfmap_dir)[0]
-
-    eddy_out = os.path.join(dwi_dir, 'eddy_denoise')
-    # # This command uses the denoised images as input and corrects for
-    # # susceptibility-by-movement interactions
-    # cmd = "eddy --imain=%s --mask=%s --acqp=%s --index=%s --bvecs=%s --bvals=%s --topup=%s --repol --out=%s" % (
-    #     dn_img, mask_img, acq_params_file, index_file, bvecs_out, bvals_out, topup_results_basename, eddy_out)
-
-    # eddy_out = os.path.join(dwi_dir, 'eddy_degibbs')
-    # This command uses the degibbsed images as input and corrects for
-    # susceptibility-by-movement interactions
-    # cmd = "eddy --imain=%s --mask=%s --acqp=%s --index=%s --bvecs=%s --bvals=%s --topup=%s --repol --out=%s" % (
-    #     dg_img, mask_img, acq_params_file, index_file, bvecs_out, bvals_out, topup_results_basename, eddy_out)
-    #
-    # print(cmd)
-    # os.system(cmd)
-
-    # Bias field correction
-
+def bias_correct():
     # Correct for negative values and values close to 0 prior to bias correction
     # For more details see ANTs documentation for N4BiasFieldCorrection
     # eddy_out = glob.glob('%s/eddy_denoise.nii.gz' % dwi_dir)[0]
@@ -338,49 +174,109 @@ def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
     #
     # nonneg_file = os.path.join(dwi_dir, 'nn_eddy_denoise.nii.gz')
     # nib.save(nib.Nifti1Image(data_, img_.affine), nonneg_file)
-
     eddy_out = glob.glob('%s/nn_eddy_denoise.nii.gz' % dwi_dir)[0]
-    bf_out = os.path.join(dwi_dir, 'bf_nn_eddy_denoise.nii.gz')
+    bf_out = os.path.join(dwi_dir, 'ants_bf_nn_eddy_denoise.nii.gz')
     # cmd = "dwibiascorrect ants %s %s -mask %s -fslgrad %s %s" % (
-    #     eddy_out, bf_out, mask_img, bvecs_out, bvals_out)
-    #
+    #     eddy_out, bf_out, mask_img, out_bvecs, out_bvals)
+    # cmd = "N4BiasFieldCorrection -d 4 -i %s -w %s -o %s -s 2 -b [150] -c [200x200,0.0]" % (
+    #     eddy_out, mask_img, bf_out)
     # print(cmd)
     # os.system(cmd)
 
-    # Align DWI images to first b0 volume
-    coreg_bf = os.path.join(dwi_dir, "coreg_bf_nn_eddy_denoise")
-    # cmd = "mcflirt -in %s -refvol 0 -out %s -mats" % (
-    #     bf_out, coreg_bf)
-    # print(cmd)
-    # os.system(cmd)
-
-    # Align DWI images to T1w image
-    align_dwi_fname = glob.glob('%s/coreg_bf_nn_eddy_denoise.nii.gz' % dwi_dir)[0]
-    template = glob.glob('%s/*T1w*' % anat_dir)[0]
-    brain = glob.glob('%s/*bet.nii.gz*' % outanat_dir)[0]
-    t1_aligned = os.path.join(dwi_dir, 't1_aligned_dwi')
-    cmd = "epi_reg --epi=%s --t1=%s --t1brain=%s --out=%s" % (
-        coreg_bf, template, brain, t1_aligned)
+def align_t1_dwi(b0_vol, hires_t1, t1_aligned)
+    cmd = "flirt --in=%s --ref=%s --out=%s" % (
+        hires_t1, b0_vol, t1_aligned)
 
     print(cmd)
     os.system(cmd)
 
-    # # Create a brain mask
-    #
-    # from dipy.segment.mask import median_otsu
-    # b0_mask, mask = median_otsu(eddy_img.get_data(), 2, 1)
-    # if subject == 'sub-13':
-    #     from nilearn.masking import compute_epi_mask
-    #     from nilearn.image import index_img
-    #     imgs_ = [index_img(eddy_img, i)
-    #              for i in range(len(bvals)) if bvals[i] < 50]
-    #     mask_img = compute_epi_mask(imgs_, upper_cutoff=.8)
-    #     mask_img.to_filename('/tmp/mask.nii.gz')
-    #     mask = mask_img.get_data()
-    # # do the tractography
-    # streamlines = tractography(eddy_img, gtab, mask, dwi_dir)
-    # return streamlines
-    #
+def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
+    subject, session = subject_session
+
+    src_dir = os.path.join(source_dir, subject, session)
+    dest_dir = os.path.join(derivatives_dir, subject, session)
+
+    src_anat_dir = os.path.join(src_dir, 'anat')
+    src_dwi_dir = os.path.join(src_dir, 'dwi')
+    src_fmap_dir = os.path.join(src_dir, 'fmap')
+
+    dest_dwi_dir = os.path.join(dest_dir, 'dwi')
+    dest_fmap_dir = os.path.join(dest_dir, 'fmap')
+    dest_anat_dir = os.path.join(dest_dir, 'anat')
+
+    # Extract T1w brain
+    t1_img = glob.glob('%s/sub*T1w.nii.gz' % anat_dir)[0]
+    # extracted = extract_brain(t1_img, write_dir, subject, session)
+
+    # Concatenate images
+    dwi_imgs = sorted(glob.glob(os.path.join(src_dwi_dir, '*run*dwi.nii.gz')))
+    out_concat = os.path.join(dest_dwi_dir, '%s_%s_dwi.nii.gz' % (subject, session))
+    # concat_images(dwi_imgs, out_concat)
+
+    # Concatenate the bval and bvec files as well
+    in_bvals = sorted(glob.glob(os.path.join(src_dwi_dir, '*run*dwi.bval')))
+    out_bvals = os.path.join(dest_dwi_dir, "bvals")
+    # concat_bvals(in_bvals, out_bvals)
+
+    in_bvecs = sorted(glob.glob(os.path.join(src_dwi_dir, '*run*dwi.bvec')))
+    out_bvecs = os.path.join(dest_dwi_dir, "bvecs")
+    # concat_bvecs(in_bvecs, out_bvecs)
+
+    # Denoise images using MP-PCA
+    out_dn = os.path.join(dest_dwi_dir, 'dn_%s_%s_dwi.nii.gz' % (subject, session))
+    # denoise_dwi(out_concat, out_dn)
+
+    # Remove Gibbs ringing artifacts
+    # The recommendation is to do this if not using partial Fourier acquisition, but we do use it.
+    # The images look a little blurred and of lower intensity than the denoised images
+    out_dg = os.path.join(dest_dwi_dir, 'dg_%s_%s_dwi.nii.gz' % (subject, session))
+    # degibbs_dwi(out_dn, out_dg)
+
+    # Run FSL topup - it's a 2-step process
+    # 1. Collect all the b=0 volumes in one file and use that as input to topup
+    b0_imgs = sorted(glob.glob('%s/dn_%s_%s_dwi.nii.gz' % (dest_dwi_dir, subject, session)))[0]
+    merged_b0_img = os.path.join(dest_dwi_dir, 'b0s_%s_%s_dwi.nii.gz' % (subject, session))
+    # collate_b0s(b0_imgs, merged_b0_img)
+
+    # 2. Calculate distortion from the collated b0 images
+    acq_params_file = os.path.join(src_dwi_dir, 'b0_acquisition_params.txt')
+    topup_results_basename = os.path.join(dest_dwi_dir, '%s_%s_topup-results' % (subject, session))
+    hifi_file = os.path.join(dest_dwi_dir, '%s_%s_hifi-b0' % (subject, session))
+    # calc_topup(merged_b0_img, acq_params_file, hifi_file, topup_results_basename)
+
+    # Calculate the mean image of the hifi_file and extract the brain from it before running eddy
+    hifi_brain = os.path.join(dest_dwi_dir, '%s_%s_hifi-b0-brain')
+    # make_hifi_mask(hifi_file, hifi_brain)
+
+    # Create a text file that contains, for each volume in the concatenated dwi images file,
+    # the corresponding line of the acquisitions create_parameter file.
+    # The way the data has been concatenated, we have 2 AP runs followed by 2 PA runs,
+    # each with 61 volumes. Thus, the text file will have 244 lines, the first 122 will
+    # say "1" and the last 122 will say "2"
+    index_file = os.path.join(dest_dwi_dir, 'dwi_acqdir_index.txt')
+    # inds = np.concatenate((np.ones(122, dtype=int), np.ones(122, dtype=int)*2))
+    # np.savetxt(index_file, inds, fmt='%d')
+
+    # Now run eddy to correct eddy current distortions
+    mask_img = glob.glob('%s/*mask.nii.gz' % dest_dwi_dir)[0]
+    eddy_in = out_dn
+    eddy_out = os.path.join(dest_dwi_dir, 'eddy_dn_%s_%s_dwi' % (subject, session))
+    # run_eddy(eddy_in, mask_img, acq_params_file, index_file, out_bvecs, out_bvals, topup_results_basename, eddy_out)
+
+    # Extract first eddy corrected volume, which is also a b0 volume
+    b0_vol = os.path.join(dest_dwi_dir, 'b0-vol_eddy_dn_%s_%s' %(subject, session))
+    # b0_mask = os.path.join(dest_dwi_dir, 'b0-mask_eddy_dn_%s_%s' %(subject, session))
+    # extract_and_mask_eddy_b0(eddy_out, b0_vol, b0_mask)
+
+    # Bias field correction
+    # Bias field correction doesn't work very well via dwibiascorrect, and
+    # fails when I try running N4BiasFieldCorrection. Skipping this step for now.
+    # bias_correct()
+
+    # Align T1w volume to DWI volumes
+    hires_t1 = glob.glob('%s/*T1w*' % src_anat_dir)[0]
+    t1_aligned = os.path.join(dest_dwi_dir, 'dwi-aligned-T1_%s_%s' %(subject, session))
+    # align_t1_dwi(hires_t1, b0_vol, t1_aligned)
 
 Parallel(n_jobs=1)(
     delayed(run_dmri_pipeline)(subject_session, do_topup, do_edc)
