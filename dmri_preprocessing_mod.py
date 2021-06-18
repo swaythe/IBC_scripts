@@ -59,15 +59,16 @@ import glob
 from joblib import Memory, Parallel, delayed
 import numpy as np
 import nibabel as nib
-from ibc_public.utils_pipeline import fsl_topup
+# from ibc_public.utils_pipeline import fsl_topup
 from dipy.segment.mask import median_otsu
 from dipy.align import register_dwi_series, register_dwi_to_template
+import dipy.reconst.dti as dti
 from dipy.reconst.dti import TensorModel, fractional_anisotropy
-from dipy.reconst.csdeconv import ConstrainedSphericalDeconvModel
+from dipy.reconst.csdeconv import recursive_response, ConstrainedSphericalDeconvModel
 from dipy.direction import peaks_from_model
-from dipy.data import get_sphere
+from dipy.data import get_sphere, default_sphere
 from dipy.core.gradients import gradient_table
-from mayavi import mlab
+# from mayavi import mlab
 from ibc_public.utils_data import get_subject_session
 
 
@@ -112,8 +113,8 @@ def degibbs_dwi(in_dg, out_dg):
     print(cmd)
     os.system(cmd)
 
-def collate_b0s(dwi_img, vols=[0, 61, 122, 183], merged_b0_img):
-    cmd = "fslroi %s %s %d 1" % (b0_imgs, vols[0], merged_b0_img)
+def collate_b0s(b0_imgs, vols, merged_b0_img):
+    cmd = "fslroi %s %s %d 1" % (b0_imgs, merged_b0_img, vols[0])
     print(cmd)
     os.system(cmd)
     cmd = "fslroi %s temp_vol %d 1" % (b0_imgs, vols[1])
@@ -134,6 +135,9 @@ def collate_b0s(dwi_img, vols=[0, 61, 122, 183], merged_b0_img):
     cmd = "fslmerge -t %s %s temp_vol" % (merged_b0_img, merged_b0_img)
     print(cmd)
     os.system(cmd)
+    cmd = "rm temp_vol*"
+    print(cmd)
+    os.system(cmd)
 
 def calc_topup(merged_b0_img, acq_params_file, hifi_file, topup_results_basename):
     cmd = "topup --imain=%s --datain=%s --config=b02b0.cnf --out=%s --iout=%s" % (
@@ -141,12 +145,12 @@ def calc_topup(merged_b0_img, acq_params_file, hifi_file, topup_results_basename
     print(cmd)
     os.system(cmd)
 
-def make_hifi_mask(hifi_file, threshold=0.67, hifi_brain):
+def make_hifi_mask(hifi_file, threshold, hifi_brain):
     cmd = "fslmaths %s -Tmean temp" % (hifi_file)
     print(cmd)
     os.system(cmd)
 
-    cmd = "bet temp %s -f %f -R -m" % (hifi_file, hifi_brain, threshold)
+    cmd = "bet temp %s -f %f -R -m" % (hifi_brain, threshold)
     print(cmd)
     os.system(cmd)
 
@@ -183,12 +187,89 @@ def bias_correct():
     # print(cmd)
     # os.system(cmd)
 
-def align_t1_dwi(b0_vol, hires_t1, t1_aligned)
+def align_t1_dwi(b0_vol, hires_t1, t1_aligned):
     cmd = "flirt --in=%s --ref=%s --out=%s" % (
         hires_t1, b0_vol, t1_aligned)
 
     print(cmd)
     os.system(cmd)
+
+def tractography(img, gtab, mask, dwi_dir, do_viz=True):
+    data = img.get_fdata()
+    # dirty imputation
+    data[np.isnan(data)] = 0
+
+    # Estimate fiber response function by using a data-driven calibration strategy
+    tenmodel = dti.TensorModel(gtab)
+    tenfit = tenmodel.fit(data, mask=data[..., 0] > 200)
+
+    FA = fractional_anisotropy(tenfit.evals)
+    MD = dti.mean_diffusivity(tenfit.evals)
+    wm_mask = (np.logical_or(FA >= 0.4, (np.logical_and(FA >= 0.15, MD >= 0.0011))))
+
+    response = recursive_response(gtab, data, mask=wm_mask, sh_order=8,
+                                  peak_thr=0.01, init_fa=0.08,
+                                  init_trace=0.0021, iter=8, convergence=0.001,
+                                  parallel=True)
+
+    response_signal = response.on_sphere(default_sphere)
+    # transform our data from 1D to 4D
+    response_signal = response_signal[None, None, None, :]
+    response_actor = actor.odf_slicer(response_signal, sphere=default_sphere,
+                                      colormap='plasma')
+
+    scene = window.Scene()
+
+    scene.add(response_actor)
+    print('Saving illustration as csd_recursive_response.png')
+    window.record(scene, out_path='csd_recursive_response.png', size=(200, 200))
+    if interactive:
+        window.show(scene)
+    scene.rm(response_actor)
+
+    # # Diffusion model
+    # csd_model = ConstrainedSphericalDeconvModel(gtab)
+    #
+    # sphere = get_sphere('symmetric724')
+    # csd_peaks = peaks_from_model(
+    #     model=csd_model, data=data, sphere=sphere, mask=mask,
+    #     relative_peak_threshold=.5, min_separation_angle=25,
+    #     parallel=False)
+    #
+    # # FA values to stop the tractography
+    # tensor_model = TensorModel(gtab, fit_method='WLS')
+    # tensor_fit = tensor_model.fit(data, mask)
+    # fa = fractional_anisotropy(tensor_fit.evals)
+    # stopping_values = np.zeros(csd_peaks.peak_values.shape)
+    # stopping_values[:] = fa[..., None]
+    #
+    # # tractography
+    # streamline_generator = EuDX(stopping_values,
+    #                             csd_peaks.peak_indices,
+    #                             seeds=10**6,
+    #                             odf_vertices=sphere.vertices,
+    #                             a_low=0.1)
+    #
+    # streamlines = [streamline for streamline in streamline_generator]
+    # streamlines = filter_according_to_length(streamlines)
+    # np.savez(os.path.join(dwi_dir, 'streamlines.npz'), streamlines)
+    #
+    # #  write the result as images
+    # hdr = nib.trackvis.empty_header()
+    # hdr['voxel_size'] = img.header.get_zooms()[:3]
+    # hdr['voxel_order'] = 'LAS'
+    # hdr['dim'] = fa.shape[:3]
+    #
+    # csd_streamlines_trk = ((sl, None, None) for sl in streamlines)
+    # csd_sl_fname = os.path.join(dwi_dir, 'csd_streamline.trk')
+    # nib.trackvis.write(csd_sl_fname, csd_streamlines_trk, hdr,
+    #                    points_space='voxel')
+    # fa_image = os.path.join(dwi_dir, 'fa_map.nii.gz')
+    # nib.save(nib.Nifti1Image(fa, img.affine), fa_image)
+    # if 1:
+    #     visualization(os.path.join(dwi_dir, 'streamlines.npz'))
+    #
+    # return streamlines
 
 def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
     subject, session = subject_session
@@ -205,7 +286,7 @@ def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
     dest_anat_dir = os.path.join(dest_dir, 'anat')
 
     # Extract T1w brain
-    t1_img = glob.glob('%s/sub*T1w.nii.gz' % anat_dir)[0]
+    t1_img = glob.glob('%s/sub*T1w.nii.gz' % src_anat_dir)[0]
     # extracted = extract_brain(t1_img, write_dir, subject, session)
 
     # Concatenate images
@@ -236,7 +317,8 @@ def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
     # 1. Collect all the b=0 volumes in one file and use that as input to topup
     b0_imgs = sorted(glob.glob('%s/dn_%s_%s_dwi.nii.gz' % (dest_dwi_dir, subject, session)))[0]
     merged_b0_img = os.path.join(dest_dwi_dir, 'b0s_%s_%s_dwi.nii.gz' % (subject, session))
-    # collate_b0s(b0_imgs, merged_b0_img)
+    vols = [0, 61, 122, 183]
+    # collate_b0s(b0_imgs, vols, merged_b0_img)
 
     # 2. Calculate distortion from the collated b0 images
     acq_params_file = os.path.join(src_dwi_dir, 'b0_acquisition_params.txt')
@@ -245,8 +327,9 @@ def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
     # calc_topup(merged_b0_img, acq_params_file, hifi_file, topup_results_basename)
 
     # Calculate the mean image of the hifi_file and extract the brain from it before running eddy
-    hifi_brain = os.path.join(dest_dwi_dir, '%s_%s_hifi-b0-brain')
-    # make_hifi_mask(hifi_file, hifi_brain)
+    hifi_brain = os.path.join(dest_dwi_dir, '%s_%s_hifi-b0-brain.nii.gz')
+    threshold = 0.67
+    # make_hifi_mask(hifi_file, threshold, hifi_brain)
 
     # Create a text file that contains, for each volume in the concatenated dwi images file,
     # the corresponding line of the acquisitions create_parameter file.
@@ -260,13 +343,18 @@ def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
     # Now run eddy to correct eddy current distortions
     mask_img = glob.glob('%s/*mask.nii.gz' % dest_dwi_dir)[0]
     eddy_in = out_dn
-    eddy_out = os.path.join(dest_dwi_dir, 'eddy_dn_%s_%s_dwi' % (subject, session))
+    eddy_out = os.path.join(dest_dwi_dir, 'eddy_dn_%s_%s_dwi.nii.gz' % (subject, session))
     # run_eddy(eddy_in, mask_img, acq_params_file, index_file, out_bvecs, out_bvals, topup_results_basename, eddy_out)
 
-    # Extract first eddy corrected volume, which is also a b0 volume
-    b0_vol = os.path.join(dest_dwi_dir, 'b0-vol_eddy_dn_%s_%s' %(subject, session))
-    # b0_mask = os.path.join(dest_dwi_dir, 'b0-mask_eddy_dn_%s_%s' %(subject, session))
-    # extract_and_mask_eddy_b0(eddy_out, b0_vol, b0_mask)
+    # Once again extract the b0 volumes, this time from the eddy corrected images,
+    # create a mean volume, and a mask of the mean volume
+    b0_imgs = glob.glob('%s/eddy_dn_%s_%s_dwi.nii.gz' % (dest_dwi_dir, subject, session))[0]
+    print(b0_imgs)
+    merged_b0_img = os.path.join(dest_dwi_dir, 'b0s_eddy_dn_%s_%s_dwi.nii.gz' % (subject, session))
+    vols = [0, 61, 122, 183]
+    # collate_b0s(b0_imgs, vols, merged_b0_img)
+    b0_brain = os.path.join(dest_dwi_dir, 'b0_brain_eddy_dn_%s_%s_dwi' % (subject, session))
+    # make_hifi_mask(merged_b0_img, threshold, b0_brain)
 
     # Bias field correction
     # Bias field correction doesn't work very well via dwibiascorrect, and
@@ -277,6 +365,17 @@ def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
     hires_t1 = glob.glob('%s/*T1w*' % src_anat_dir)[0]
     t1_aligned = os.path.join(dest_dwi_dir, 'dwi-aligned-T1_%s_%s' %(subject, session))
     # align_t1_dwi(hires_t1, b0_vol, t1_aligned)
+
+    # load the data
+    gtab = gradient_table(out_bvals, out_bvecs, b0_threshold=10)
+
+    # do the tractography
+    b0_mask = glob.glob('%s/b0_brain_eddy_dn_%s_%s_dwi_mask.nii.gz' % (dest_dwi_dir, subject, session))[0]
+
+    tractography(nib.load(eddy_out), gtab, b0_mask, dest_dwi_dir)
+
+    # streamlines = tractography(nib.load(eddy_out), gtab, b0_mask, dest_dwi_dir)
+    # return streamlines
 
 Parallel(n_jobs=1)(
     delayed(run_dmri_pipeline)(subject_session, do_topup, do_edc)
