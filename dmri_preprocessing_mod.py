@@ -196,17 +196,23 @@ def align_t1_dwi(b0_vol, hires_t1, t1_aligned):
 
 def tractography(img, gtab, mask, dwi_dir, do_viz=True):
     data = img.get_fdata()
+    # out = np.isnan(data, where=True)
+    # print(out)
     # dirty imputation
-    data[np.isnan(data)] = 0
+    # data[np.isnan(data)] = 0
 
     # Estimate fiber response function by using a data-driven calibration strategy
     tenmodel = dti.TensorModel(gtab)
-    tenfit = tenmodel.fit(data, mask=data[..., 0] > 200)
+    tenfit = tenmodel.fit(data, mask=(nib.load(mask)).get_fdata())
 
     FA = fractional_anisotropy(tenfit.evals)
     MD = dti.mean_diffusivity(tenfit.evals)
     wm_mask = (np.logical_or(FA >= 0.4, (np.logical_and(FA >= 0.15, MD >= 0.0011))))
+    # wm_mask_file = os.path.join(dwi_dir, 'wm_mask.nii.gz')
+    # nib.save(nib.Nifti1Image(wm_mask, img.affine, img.header), wm_mask_file)
 
+    # wm_mask = (nib.load(wm_mask_file)).get_fdata()
+    # print(wm_mask.shape, data.shape)
     response = recursive_response(gtab, data, mask=wm_mask, sh_order=8,
                                   peak_thr=0.01, init_fa=0.08,
                                   init_trace=0.0021, iter=8, convergence=0.001,
@@ -349,7 +355,6 @@ def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
     # Once again extract the b0 volumes, this time from the eddy corrected images,
     # create a mean volume, and a mask of the mean volume
     b0_imgs = glob.glob('%s/eddy_dn_%s_%s_dwi.nii.gz' % (dest_dwi_dir, subject, session))[0]
-    print(b0_imgs)
     merged_b0_img = os.path.join(dest_dwi_dir, 'b0s_eddy_dn_%s_%s_dwi.nii.gz' % (subject, session))
     vols = [0, 61, 122, 183]
     # collate_b0s(b0_imgs, vols, merged_b0_img)
