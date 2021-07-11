@@ -222,175 +222,6 @@ def visualize_mayavi(streamlines_file):
     # print(figname)
     # mlab.close()
 
-def visualize_dipy(fa_file, streamlines_file, ref_file, dwi_dir):
-    fa_data = nib.load(fa_file).get_fdata()
-    shape = fa_data.shape
-    tractogram = load_trk(streamlines_file, ref_file, Space.RASMM, bbox_valid_check=False)
-    tractogram.remove_invalid_streamlines()
-    streamlines = tractogram.streamlines
-
-    # Display resulting streamlines
-    if has_fury:
-        # Prepare the display objects.
-        streamlines_actor = actor.line(streamlines, colormap.line_colors(streamlines))
-        slicer_opacity = 0.6
-
-        image_actor_z = actor.slicer(fa_data, affine=np.eye(4))
-        image_actor_z.opacity(slicer_opacity)
-        z_midpoint = int(np.round(shape[2] / 2))
-        image_actor_z.display_extent(0,
-                                     shape[0] - 1,
-                                     0,
-                                     shape[1] - 1,
-                                     z_midpoint,
-                                     z_midpoint)
-
-        # image_actor_x = image_actor_z.copy()
-        # x_midpoint = int(np.round(shape[0] / 2))
-        # image_actor_x.display_extent(x_midpoint,
-        #                              x_midpoint,
-        #                              0,
-        #                              shape[1] - 1,
-        #                              0,
-        #                              shape[2] - 1)
-        #
-        # image_actor_y = image_actor_z.copy()
-        # y_midpoint = int(np.round(shape[1] / 2))
-        # image_actor_y.display_extent(0,
-        #                              shape[0] - 1,
-        #                              y_midpoint,
-        #                              y_midpoint,
-        #                              0,
-        #                              shape[2] - 1)
-
-        # Create the 3D display.
-        scene = window.Scene()
-        scene.add(streamlines_actor)
-        # scene.add(image_actor_x)
-        # scene.add(image_actor_y)
-        # scene.add(image_actor_z)
-
-        show_m = window.ShowManager(scene, size=(1200, 900))
-        show_m.initialize()
-
-        line_slider_z = ui.LineSlider2D(min_value=0,
-                                        max_value=shape[2] - 1,
-                                        initial_value=shape[2] / 2,
-                                        text_template="{value:.0f}",
-                                        length=140)
-
-        line_slider_x = ui.LineSlider2D(min_value=0,
-                                        max_value=shape[0] - 1,
-                                        initial_value=shape[0] / 2,
-                                        text_template="{value:.0f}",
-                                        length=140)
-
-        line_slider_y = ui.LineSlider2D(min_value=0,
-                                        max_value=shape[1] - 1,
-                                        initial_value=shape[1] / 2,
-                                        text_template="{value:.0f}",
-                                        length=140)
-
-        opacity_slider = ui.LineSlider2D(min_value=0.0,
-                                         max_value=1.0,
-                                         initial_value=slicer_opacity,
-                                         length=140)
-
-        line_slider_z.on_change = change_slice_z
-        line_slider_x.on_change = change_slice_x
-        line_slider_y.on_change = change_slice_y
-        opacity_slider.on_change = change_opacity
-
-        line_slider_label_z = build_label(text="Z Slice")
-        line_slider_label_x = build_label(text="X Slice")
-        line_slider_label_y = build_label(text="Y Slice")
-        opacity_slider_label = build_label(text="Opacity")
-
-        panel = ui.Panel2D(size=(300, 200),
-                           color=(1, 1, 1),
-                           opacity=0.1,
-                           align="right")
-        panel.center = (1030, 120)
-
-        panel.add_element(line_slider_label_x, (0.1, 0.75))
-        panel.add_element(line_slider_x, (0.38, 0.75))
-        panel.add_element(line_slider_label_y, (0.1, 0.55))
-        panel.add_element(line_slider_y, (0.38, 0.55))
-        panel.add_element(line_slider_label_z, (0.1, 0.35))
-        panel.add_element(line_slider_z, (0.38, 0.35))
-        panel.add_element(opacity_slider_label, (0.1, 0.15))
-        panel.add_element(opacity_slider, (0.38, 0.15))
-
-        scene.add(panel)
-        size = scene.GetSize()
-
-        show_m = window.ShowManager(scene, size=(1200, 900))
-        show_m.initialize()
-
-        interactive = True
-
-        scene.zoom(1.5)
-        scene.reset_clipping_range()
-
-        if interactive:
-
-            show_m.add_window_callback(win_callback)
-            show_m.render()
-            show_m.start()
-
-        else:
-
-            window.record(scene, out_path=os.path.join(dwi_dir,'bundles_and_3_slices.png'),
-                          size=(1200, 900), reset_camera=False)
-
-        # Save still images for this static example. Or for interactivity use
-        window.record(scene, out_path=os.path.join(dwi_dir,'tractogram.png'), size=(800, 800))
-        if interactive:
-            window.show(scene)
-
-def win_callback(obj, event):
-    global size
-    if size != obj.GetSize():
-        size_old = size
-        size = obj.GetSize()
-        size_change = [size[0] - size_old[0], 0]
-        panel.re_align(size_change)
-
-def change_slice_z(slider):
-    z = int(np.round(slider.value))
-    image_actor_z.display_extent(0, shape[0] - 1, 0, shape[1] - 1, z, z)
-
-
-def change_slice_x(slider):
-    x = int(np.round(slider.value))
-    image_actor_x.display_extent(x, x, 0, shape[1] - 1, 0, shape[2] - 1)
-
-
-def change_slice_y(slider):
-    y = int(np.round(slider.value))
-    image_actor_y.display_extent(0, shape[0] - 1, y, y, 0, shape[2] - 1)
-
-
-def change_opacity(slider):
-    slicer_opacity = slider.value
-    image_actor_z.opacity(slicer_opacity)
-    image_actor_x.opacity(slicer_opacity)
-    image_actor_y.opacity(slicer_opacity)
-
-def build_label(text):
-    label = ui.TextBlock2D()
-    label.message = text
-    label.font_size = 18
-    label.font_family = 'Arial'
-    label.justification = 'left'
-    label.bold = False
-    label.italic = False
-    label.shadow = False
-    label.background_color = (0, 0, 0)
-    label.color = (1, 1, 1)
-
-    return label
-
 def tractography(img, gtab, mask, seeds, dwi_dir, fa_file, wm_file, trk_file):
     data = img.get_fdata()
     mask_data = mask.get_fdata()
@@ -408,24 +239,24 @@ def tractography(img, gtab, mask, seeds, dwi_dir, fa_file, wm_file, trk_file):
 
     MD = dti.mean_diffusivity(tensor_fit.evals)
     wm_mask = (np.logical_or(FA >= 0.4, (np.logical_and(FA >= 0.15, MD >= 0.0011))))
-    nib.save(nib.Nifti1Image(wm_mask, img.affine, img.header), wm_file)
+    # nib.save(nib.Nifti1Image(wm_mask, img.affine, img.header), wm_file)
 
     response = recursive_response(gtab, data, mask=wm_mask, sh_order=8,
                                   peak_thr=0.01, init_fa=0.08,
                                   init_trace=0.0021, iter=8, convergence=0.001,
                                   parallel=True)
 
-    response_signal = response.on_sphere(sphere)
-    # Transform data from 1D to 4D
-    response_signal = response_signal[None, None, None, :]
-    response_actor = actor.odf_slicer(response_signal, sphere=sphere)
-
-    scene = window.Scene()
-
-    scene.add(response_actor)
-    print('Saving illustration as csd_recursive_response.png')
-    window.record(scene, out_path=os.path.join(dwi_dir,'csd_recursive_response.png'), size=(200, 200))
-    scene.rm(response_actor)
+    # response_signal = response.on_sphere(sphere)
+    # # Transform data from 1D to 4D
+    # response_signal = response_signal[None, None, None, :]
+    # response_actor = actor.odf_slicer(response_signal, sphere=sphere)
+    #
+    # scene = window.Scene()
+    #
+    # scene.add(response_actor)
+    # print('Saving illustration as csd_recursive_response.png')
+    # window.record(scene, out_path=os.path.join(dwi_dir,'csd_recursive_response.png'), size=(200, 200))
+    # scene.rm(response_actor)
 
     # Deconvolution
     csd_model = ConstrainedSphericalDeconvModel(gtab, response)
@@ -434,10 +265,10 @@ def tractography(img, gtab, mask, seeds, dwi_dir, fa_file, wm_file, trk_file):
     # Show the CSD-based orientation distribution functions (ODFs) also known as FODFs (fiber ODFs)
     csd_odf = csd_fit.odf(sphere)
     # Visualize a small (30x30) region
-    fodf_spheres = actor.odf_slicer(csd_odf, sphere=sphere, scale=0.9, norm=False)
-    scene.add(fodf_spheres)
-    print('Saving illustration as csd_odfs.png')
-    window.record(scene, out_path=os.path.join(dwi_dir,'csd_odfs.png'), size=(600, 600))
+    # fodf_spheres = actor.odf_slicer(csd_odf, sphere=sphere, scale=0.9, norm=False)
+    # scene.add(fodf_spheres)
+    # print('Saving illustration as csd_odfs.png')
+    # window.record(scene, out_path=os.path.join(dwi_dir,'csd_odfs.png'), size=(600, 600))
 
     # Find the peak directions (maxima) of the ODFs
     csd_peaks = peaks_from_model(model=csd_model,
@@ -449,30 +280,32 @@ def tractography(img, gtab, mask, seeds, dwi_dir, fa_file, wm_file, trk_file):
                                  parallel=True)
 
     # Some visualizations
-    scene.clear()
-    fodf_peaks = actor.peak_slicer(csd_peaks.peak_dirs, csd_peaks.peak_values)
-    scene.add(fodf_peaks)
-    print('Saving illustration as csd_peaks.png')
-    window.record(scene, out_path=os.path.join(dwi_dir,'csd_peaks.png'), size=(600, 600))
+    # scene.clear()
+    # fodf_peaks = actor.peak_slicer(csd_peaks.peak_dirs, csd_peaks.peak_values)
+    # scene.add(fodf_peaks)
+    # print('Saving illustration as csd_peaks.png')
+    # window.record(scene, out_path=os.path.join(dwi_dir,'csd_peaks.png'), size=(600, 600))
+    #
+    # # Visualize both the ODFs and peaks in the same space
+    # fodf_spheres.GetProperty().SetOpacity(0.4)
+    # scene.add(fodf_spheres)
+    # print('Saving illustration as csd_both.png')
+    # window.record(scene, out_path=os.path.join(dwi_dir,'csd_both.png'), size=(600, 600))
 
-    # Visualize both the ODFs and peaks in the same space
-    fodf_spheres.GetProperty().SetOpacity(0.4)
-    scene.add(fodf_spheres)
-    print('Saving illustration as csd_both.png')
-    window.record(scene, out_path=os.path.join(dwi_dir,'csd_both.png'), size=(600, 600))
-
-    if has_fury:
-        scene = window.Scene()
-        scene.add(actor.peak_slicer(csd_peaks.peak_dirs,
-                                    csd_peaks.peak_values,
-                                    colors=None))
-
-        window.record(scene, out_path=os.path.join(dwi_dir,'csd_direction_field.png'), size=(900, 900))
+    # if has_fury:
+    #     scene = window.Scene()
+    #     scene.add(actor.peak_slicer(csd_peaks.peak_dirs,
+    #                                 csd_peaks.peak_values,
+    #                                 colors=None))
+    #
+    #     window.record(scene, out_path=os.path.join(dwi_dir,'csd_direction_field.png'), size=(900, 900))
 
     # tractography
     stopping_criterion = ThresholdStoppingCriterion(csd_peaks.gfa, .25)
+    print(stopping_criterion)
+    print(csd_peaks.gfa.shape)
 
-    # sli = csd_peaks.gfa.shape[2]-1
+    # sli = csd_peaks.gfa.shape[2]
     # plt.figure('GFA')
     # plt.subplot(1, 2, 1).set_axis_off()
     # plt.imshow(csd_peaks.gfa[:, :, sli].T, cmap='gray', origin='lower')
@@ -488,18 +321,18 @@ def tractography(img, gtab, mask, seeds, dwi_dir, fa_file, wm_file, trk_file):
     np.savez(os.path.join(dwi_dir, 'streamlines.npz'), streamlines)
 
     # Display resulting streamlines
-    if has_fury:
-        # Prepare the display objects.
-        streamlines_actor = actor.line(streamlines, colormap.line_colors(streamlines))
-
-        # Create the 3D display.
-        scene = window.Scene()
-        scene.add(streamlines_actor)
-
-        # Save still images for this static example. Or for interactivity use
-        window.record(scene, out_path=os.path.join(dwi_dir,'tractogram_EuDX.png'), size=(800, 800))
-        # if interactive:
-        #     window.show(scene)
+    # if has_fury:
+    #     # Prepare the display objects.
+    #     streamlines_actor = actor.line(streamlines, colormap.line_colors(streamlines))
+    #
+    #     # Create the 3D display.
+    #     scene = window.Scene()
+    #     scene.add(streamlines_actor)
+    #
+    #     # Save still images for this static example. Or for interactivity use
+    #     window.record(scene, out_path=os.path.join(dwi_dir,'tractogram_EuDX.png'), size=(800, 800))
+    #     # if interactive:
+    #     #     window.show(scene)
 
     sft = StatefulTractogram(streamlines, img, Space.RASMM)
     save_trk(sft, trk_file, streamlines)
@@ -609,11 +442,10 @@ def run_dmri_pipeline(subject_session, do_topup=True, do_edc=True):
     fa_file = os.path.join(dest_dwi_dir, "fa_map.nii.gz")
     wm_file = os.path.join(dest_dwi_dir, "wm_mask.nii.gz")
     trk_file = os.path.join(dest_dwi_dir, "tractogram_EuDX.trk")
-    # tractography(nib.load(eddy_out), gtab, b0_mask_img, seeds, dest_dwi_dir, fa_file, wm_file, trk_file)
+    tractography(nib.load(eddy_out), gtab, b0_mask_img, seeds, dest_dwi_dir, fa_file, wm_file, trk_file)
 
     # Visualize tractography
-    # visualize_dipy(fa_file, trk_file, eddy_out, dest_dwi_dir)
-    visualize_mayavi(os.path.join(dest_dwi_dir, 'streamlines.npz'))
+    # visualize_mayavi(os.path.join(dest_dwi_dir, 'streamlines.npz'))
 
 Parallel(n_jobs=1)(
     delayed(run_dmri_pipeline)(subject_session, do_topup, do_edc)
