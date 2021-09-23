@@ -83,7 +83,7 @@ def make_hifi_mask(hifi_file, threshold, hifi_brain):
     print(cmd)
     os.system(cmd)
 
-def make_acqdir_file(index_file, nvols)
+def make_acqdir_file(index_file, nvols):
     inds = np.concatenate((np.ones(nvols*2, dtype=int), np.ones(nvols*2, dtype=int)*2))
     np.savetxt(index_file, inds, fmt='%d')
 
@@ -125,7 +125,7 @@ def convert_mif(in_file, out_file):
     print(cmd)
     os.system(cmd)
 
-def calc_basis_fn(algorithm='dhollander', eddy_mif, wm_out, gm_out, csf_out, bvecs, bvals, mask, voxels_out):
+def calc_basis_fn(eddy_mif, wm_out, gm_out, csf_out, bvecs, bvals, mask, voxels_out, algorithm='dhollander'):
     cmd = 'dwi2response %s %s %s %s %s -fslgrad %s %s -mask %s -voxels %s' % (algorithm, eddy_mif, wm_out, gm_out, csf_out, bvecs, bvals, mask, voxels_out)
     print(cmd)
     os.system(cmd)
@@ -151,7 +151,7 @@ def convert_xform_mat(transform_mat, mean_b0, t1_nifti, transform_mat_mrtrix):
     print(cmd)
     os.system(cmd)
 
-def reg_to_dwi(seg_out, transform_mat_mrtrix, dtype='float32', seg_out_coreg):
+def reg_to_dwi(seg_out, transform_mat_mrtrix, seg_out_coreg, dtype='float32'):
     cmd = 'mrtransform %s -linear %s -inverse -datatype %s %s' % (seg_out, transform_mat_mrtrix, dtype, seg_out_coreg)
     print(cmd)
     os.system(cmd)
@@ -161,7 +161,7 @@ def gen_gmwm_boundary(seg_out_coreg, gmwm_bound):
     print(cmd)
     os.system(cmd)
 
-def gen_streamlines(seg_out_coreg, gmwm_bound, max_len=250, cutoff=0.06, nstreamlines=10000000, wm_fod_norm, track_out):
+def gen_streamlines(seg_out_coreg, gmwm_bound, wm_fod_norm, track_out, max_len=250, cutoff=0.06, nstreamlines=10000000):
     cmd = 'tckgen -act %s -backtrack -seed_gmwmi %s -maxlength %s -cutoff %s -select %s %s %s' % (seg_out_coreg, gmwm_bound, str(max_len), str(cutoff), str(nstreamlines), wm_fod_norm, track_out)
     print(cmd)
     os.system(cmd)
@@ -286,7 +286,7 @@ def run_dmri_preproc(subject_session):
     gm_out = os.path.join(dest_dwi_dir, 'gm_%s_%s_dwi.txt' % (subject, session))
     csf_out = os.path.join(dest_dwi_dir, 'csf_%s_%s_dwi.txt' % (subject, session))
     voxels_out = os.path.join(dest_dwi_dir, 'voxels_%s_%s_dwi.mif' % (subject, session))
-    calc_basis_fn(algorithm, eddy_mif, wm_out, gm_out, csf_out, bvecs, bvals, mask, voxels_out)
+    calc_basis_fn(eddy_mif, wm_out, gm_out, csf_out, bvecs, bvals, mask, voxels_out, algorithm)
     # Use mrview to visualize the voxels file to make sure voxels are in the correct tissue group.
     # Red markers should be in CSF, Green markers should be in gray matter, Blue markers should be in white matter
     # View the basis functions files using shview.
@@ -320,7 +320,7 @@ def run_dmri_preproc(subject_session):
     # Apply the transformation matrix to the non-coregistered segmentation data:
     seg_out_coreg = os.path.join(dest_dwi_dir, 'coreg-seg_%s_%s_T1w.mif' % (subject, session))
     dtype = 'float32'
-    reg_to_dwi(seg_out, transform_mat_mrtrix, dtype, seg_out_coreg)
+    reg_to_dwi(seg_out, transform_mat_mrtrix, seg_out_coreg, dtype)
 
     # Generate GM/WM boundary
     gmwm_bound = os.path.join(dest_dwi_dir, 'gmwm-bound-coreg_%s_%s.mif' % (subject, session))
@@ -331,7 +331,7 @@ def run_dmri_preproc(subject_session):
     max_len = 250
     cutoff = 0.06
     nstreamlines = 10000000
-    gen_streamlines(seg_out_coreg, gmwm_bound, max_len, cutoff, nstreamlines, wm_fod_norm, track_out)
+    gen_streamlines(seg_out_coreg, gmwm_bound, wm_fod_norm, track_out, max_len, cutoff, nstreamlines)
 
     # Start work on building the connectome
 
@@ -352,7 +352,7 @@ def run_dmri_preproc(subject_session):
     # Coregister the parcellation
     coreg_parcel = os.path.join(dest_dwi_dir, 'coreg_%s_%s_parcels.mif' % (subject, session))
     dtype = 'uint32'
-    reg_to_dwi(parcels, transform_mat_mrtrix, dtype, coreg_parcel)
+    reg_to_dwi(parcels, transform_mat_mrtrix, coreg_parcel, dtype)
 
     # Creating the connectome
     coreg_parcel_csv = os.path.join(dest_dwi_dir, 'coreg_%s_%s_parcels.csv' % (subject, session))
